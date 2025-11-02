@@ -163,7 +163,7 @@ def draw():
 
     # ジャンプ中は少し上に表示
     y = player_y - jump_count
-    pyxel.circfill(player_x, y, 8, color)
+    pyxel.circ(player_x, y, 8, color)
 
 pyxel.run(update, draw)
 ```
