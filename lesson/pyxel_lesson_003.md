@@ -32,7 +32,6 @@ Pyxel では以下のキーを検出できます：
 |                        | `pyxel.KEY_D`         | D キー             |                      |
 |                        | `pyxel.KEY_Z`         | Z キー             | アクションによく使う |
 |                        | `pyxel.KEY_X`         | X キー             |                      |
-| **数字キー**           | `pyxel.KEY_0`         | 0 キー             | 0〜9 全て使用可能    |
 |                        | `pyxel.KEY_1`         | 1 キー             |                      |
 |                        | `pyxel.KEY_2`         | 2 キー             |                      |
 |                        | `pyxel.KEY_3`         | 3 キー             |                      |
@@ -163,7 +162,7 @@ def draw():
 
     # ジャンプ中は少し上に表示
     y = player_y - jump_count
-    pyxel.circfill(player_x, y, 8, color)
+    pyxel.circ(player_x, y, 8, color)
 
 pyxel.run(update, draw)
 ```
