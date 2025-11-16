@@ -1,21 +1,22 @@
 import pyxel
 
-ball_x = 80
-ball_y = 60
-dx = 2
-dy = 1
+ball1_x,ball1_y = 40,30
+ball1_dx,ball1_dy =2,1
 
-pyxel.init(160,120)
+ball2_x,ball2_y = 80,60
+ball2_dx,ball2_dy = -1,2
+
+ball3_x,ball3_y = 120,90
+ball3_dx,ball3_dy = 1,-1
 
 def update():
-    global ball_x,ball_y
+    global ball1_x,ball1_y,ball1_dx,ball1_dy
+    global ball2_x,ball2_y,ball2_dx,ball2_dy
+    global ball3_x,ball3_y,ball3_dx,ball3_dy
 
-    ball_x += dx
-    ball_y += dy
+    ball1_x +=ball1_dx
+    ball1_y +=ball1_dy
 
-def draw():
-    pyxel.cls(1)
-    pyxel.circ(ball_x,ball_y,8,10)
-
-pyxel.run(update,draw)
-
+    if ball1_x <= 0 or ball1_x >= 160: ball1_dx = -ball1_dx
+    if ball1_y <= 0 or ball1_y >= 120: ball1_dy = -ball1_dy
+    
