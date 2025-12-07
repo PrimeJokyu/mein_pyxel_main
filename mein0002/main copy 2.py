@@ -49,6 +49,21 @@ def update():
         tree_x = 0
         pass
 
+    # ← →
+    if pyxel.btn(pyxel.KEY_RIGHT) or pyxel.btn(pyxel.KEY_D):
+        tree2_x -= speed*1.5
+    if pyxel.btn(pyxel.KEY_LEFT) or pyxel.btn(pyxel.KEY_A):
+        tree2_x += speed*1.5
+
+    #画面端のワープ
+    if tree2_x <= -10 :
+        tree2_x = 219
+        pass
+
+    if tree2_x >= 220 :
+        tree2_x = 0
+        pass
+
     # スペースでジャンプ開始
     # 条件: 地面にいるときだけジャンプできる（2段ジャンプ防止）
     if pyxel.btnp(pyxel.KEY_SPACE):
@@ -89,5 +104,8 @@ def draw():
     
     pyxel.rect(tree2_x,75, 2,13,4)
     pyxel.circ(tree2_x,70, 5,11)
+    
+    pyxel.rect(tree2_x-50,75, 2,13,4)
+    pyxel.circ(tree2_x-50,70, 5,11)
     
 pyxel.run(update, draw)
