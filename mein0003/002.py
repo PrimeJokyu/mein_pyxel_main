@@ -11,11 +11,15 @@ def update():
     global ball_x,ball_y
 
     ball_x += dx
-    ball_y += dy
+    
+    if ball_x > 160:
+        ball_x = 0
+    if ball_x < 0 :
+        ball_x = 0
 
 def draw():
     pyxel.cls(1)
-    pyxel.circ(ball_x,ball_y,8,10)
+    pyxel.circ(ball_x,ball_y,8,90)
 
 pyxel.run(update,draw)
 
