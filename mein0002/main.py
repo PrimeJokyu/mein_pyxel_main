@@ -1,3 +1,4 @@
+#python -m pyxel edit my_game.pyxres
 import pyxel
 player_x = 80
 player_y = 60
@@ -6,9 +7,9 @@ state = 0
 counter = 0
 
 enemies = [
-    {"x": 30, "y": 80, "hp": 30, "type": "slime", "death": 0},
-    {"x": 130, "y": 40, "hp": 50, "type": "goblin", "death": 0},
-    {"x": 60, "y": 20, "hp": 20, "type": "bat", "death": 0}
+    {"x": 30, "y": 80, "hp": 30, "type": "slime", "death": 0,"death_timer": 0,"done":False},
+    {"x": 130, "y": 40, "hp": 50, "type": "goblin", "death": 0,"death_timer": 0,"done":False},
+    {"x": 60, "y": 20, "hp": 20, "type": "bat", "death": 0,"death_timer": 0,"done":False}
 ]
 
 pyxel.init(160, 120, fps=30)
@@ -16,6 +17,7 @@ pyxel.load("my_game.pyxres")
 
 def update():
     global player_x, facing,player_y,counter, state
+
 
     if pyxel.btn(pyxel.KEY_LEFT):
         player_x -= 2
@@ -34,32 +36,40 @@ def update():
     if counter >= 15:          # fps=1 なので 1フレーム=1秒
         counter = 0
         state = 16 if state == 0 else 0
-
+        
     for enemy in enemies:
-        # 敵の種類に応じた行動
+
+        # ===== 移動処理 =====
         if enemy["type"] == "slime":
-            # スライムは左右に移動
-            enemy["x"] += pyxel.rndi(-1, 1)
-            if enemy["hp"] == 0:
-                enemy["death"] = 16
+            enemy["x"] += pyxel.rndi(-3, 3)
 
         elif enemy["type"] == "goblin":
-            # ゴブリンはプレイヤーに近づく
             if enemy["x"] < player_x:
                 enemy["x"] += 1
             elif enemy["x"] > player_x:
                 enemy["x"] -= 1
-            if enemy["hp"] == 0:
-                enemy["death"] = 16
 
         elif enemy["type"] == "bat":
-            # コウモリは円運動
             import math
             angle = pyxel.frame_count * 0.1
             enemy["x"] = 80 + math.cos(angle) * 30
             enemy["y"] = 60 + math.sin(angle) * 20
-            if enemy["hp"] == 0:
-                enemy["death"] = 16
+
+
+        # ===== 死亡トリガー（1回だけ）=====
+        if enemy["hp"] == 0 and not enemy["done"]:
+            enemy["death"] = 16
+            enemy["death_timer"] = 30
+            enemy["done"] = True
+
+
+        # ===== 死亡タイマー =====
+        if enemy["done"]:
+            enemy["death_timer"] -= 1
+            if enemy["death_timer"] <= 0:
+                enemy["death"] = 32
+
+
 
 
     # A を押したら、プレイヤーに近い敵の HP を 5 減らす（連打防止で1押し1回）
@@ -94,11 +104,11 @@ def draw():
     for enemy in enemies:
         # 敵の種類に応じたスプライト表示
         if enemy["type"] == "slime":
-            pyxel.blt(enemy["x"], enemy["y"], 1, 0, enemy["death"], 16, 16, 0)
+            pyxel.blt(enemy["x"], enemy["y"], 1, 0, enemy["death"], 16, 16, 1)
         elif enemy["type"] == "goblin":
-            pyxel.blt(enemy["x"], enemy["y"], 1, 16, enemy["death"], 16, 16, 0)
+            pyxel.blt(enemy["x"], enemy["y"], 1, 16, enemy["death"], 16, 16, 1)
         elif enemy["type"] == "bat":
-            pyxel.blt(enemy["x"], enemy["y"], 1, 32, enemy["death"], 16, 16, 0)
+            pyxel.blt(enemy["x"], enemy["y"], 1, 32, enemy["death"], 16, 16, 1)
 
         # HPバーの表示
         bar_width = enemy["hp"] // 5
