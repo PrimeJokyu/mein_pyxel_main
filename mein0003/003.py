@@ -8,26 +8,32 @@ color = 8
 pyxel.init(160,120)
 
 def update():
-    global player_x,player_y
+    global player_x,player_y, player_color, player_size
 
-    speed = 3
-
+    base_speed = 2
+    turbo_speed = 5
     dx = 0
     dy = 0
-    
-    if pyxel.btn(pyxel.KEY_LEFT) or pyxel.btn(pyxel.KEY_A):
-        player_x -= speed
-    if pyxel.btn(pyxel.KEY_RIGHT) or pyxel.btn(pyxel.KEY_D):
-        player_x += speed
-    if pyxel.btn(pyxel.KEY_UP) or pyxel.btn(pyxel.KEY_W):
-        player_y -= speed
-    if pyxel.btn(pyxel.KEY_DOWN) or pyxel.btn(pyxel.KEY_S):
-        player_y += speed
-    if pyxel.btnp(pyxel.KEY_C):
-        color = (color+1) % 16
 
-    player_x += dx
-    player_y += dy
+    if pyxel.btn(pyxel.KEY_LEFT):
+        player_x -= base_speed
+    if pyxel.btn(pyxel.KEY_RIGHT):
+        player_x += base_speed
+    if pyxel.btn(pyxel.KEY_UP):
+        player_y -= speed
+    if pyxel.btn(pyxel.KEY_DOWN):
+        player_y += speed
+    if pyxel.btn(pyxel.KEY_A):
+        player_x -= turbo_speed
+    if pyxel.btn(pyxel.KEY_D):
+        player_x += turbo_speed
+    if pyxel.btn(pyxel.KEY_W)
+        player_y -= turbo_speed
+    if pyxel.btn(pyxel.KEY_S)
+        player_y += turbo_speed
+    
+    player_x = max(0, min(player_x, 160))
+    player_y = max(0, min(player_y, 120))
 
 def draw():
     pyxel.cls(1)
