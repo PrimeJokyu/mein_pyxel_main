@@ -1,4 +1,4 @@
-
+#pyxel edit ./mein0002/my_game.pyxres
 import pyxel
 player_x = 80
 player_y = 60

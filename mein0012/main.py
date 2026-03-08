@@ -1,189 +1,276 @@
+# Version: 1.0.3 (Ultra Small Tiles)
 import pyxel
-import math
 import random
+import math
 
-TILE_SIZE = 8
-FIELD_WIDTH = 50
-FIELD_HEIGHT = 50
+# Constants
+SCREEN_WIDTH = 160
+SCREEN_HEIGHT = 120
+TILE_SIZE = 2  # Ultra small!
+GRID_W = SCREEN_WIDTH // TILE_SIZE
+GRID_H = SCREEN_HEIGHT // TILE_SIZE
 
-class SplatoonCursorBomb:
-    def __init__(self):
-        pyxel.init(160, 120, title="カーソル爆発ボム")
-        self.x = FIELD_WIDTH * TILE_SIZE // 2
-        self.y = FIELD_HEIGHT * TILE_SIZE // 2
-        self.angle = 0
+# Colors
+COL_BG = 0
+COL_WALL = 13
+COL_WALL_LOW = 5
+COL_BASE = 11
+COL_ENEMY = 8
+COL_TURRET = 12
+COL_SHOT = 10
+COL_TEXT = 7
+COL_HOVER = 5
+COL_DAMAGE = 8
+
+# Block Types
+TYPE_NONE = 0
+TYPE_WALL = 1
+TYPE_TURRET = 2
+TYPE_BASE = 9
+
+# Costs
+COST_WALL = 1
+COST_TURRET = 5 # Increased relative cost
+
+# Game States
+STATE_TITLE = 0
+STATE_BUILD = 1
+STATE_DEFEND = 2
+STATE_GAMEOVER = 3
+
+class Block:
+    def __init__(self, btype):
+        self.type = btype
+        self.flash_timer = 0
+        if btype == TYPE_WALL:
+            self.hp = 3
+            self.max_hp = 3
+        elif btype == TYPE_TURRET:
+            self.hp = 2
+            self.max_hp = 2
+        else:
+            self.hp = 20
+            self.max_hp = 20
+
+class Enemy:
+    def __init__(self, x, y, target_x, target_y):
+        self.x = x
+        self.y = y
+        self.target_x = target_x
+        self.target_y = target_y
+        self.speed = 0.3
         self.hp = 3
         self.alive = True
-        self.bomb_cooldown = 0
-        self.explosions = []
+        self.attack_cooldown = 0
 
-        self.enemies = [
-            {"x": 100, "y": 100, "hp": 3, "alive": True},
-            {"x": 250, "y": 180, "hp": 3, "alive": True}
-        ]
-
-        self.ink_particles = []
-        self.field = [[0 for _ in range(FIELD_WIDTH)] for _ in range(FIELD_HEIGHT)]
-        self.frame_count = 0
-
-        pyxel.mouse(True)
-        pyxel.run(self.update, self.draw)
-
-    def update(self):
-        self.frame_count += 1
-        if not self.alive:
+    def update(self, app):
+        if self.attack_cooldown > 0:
+            self.attack_cooldown -= 1
             return
 
-        dx = pyxel.mouse_x - pyxel.width // 2
-        dy = pyxel.mouse_y - pyxel.height // 2
-        self.angle = math.atan2(dy, dx)
+        gx = int(self.x // TILE_SIZE)
+        gy = int(self.y // TILE_SIZE)
+        
+        target_block = None
+        if 0 <= gx < GRID_W and 0 <= gy < GRID_H:
+             if app.grid[gy][gx] is not None:
+                  target_block = app.grid[gy][gx]
 
-        speed = 2
-        move_x = move_y = 0
-        if pyxel.btn(pyxel.KEY_W):
-            move_x += math.cos(self.angle) * speed
-            move_y += math.sin(self.angle) * speed
-        if pyxel.btn(pyxel.KEY_S):
-            move_x -= math.cos(self.angle) * speed
-            move_y -= math.sin(self.angle) * speed
-        if pyxel.btn(pyxel.KEY_A):
-            move_x += math.cos(self.angle - math.pi / 2) * speed
-            move_y += math.sin(self.angle - math.pi / 2) * speed
-        if pyxel.btn(pyxel.KEY_D):
-            move_x += math.cos(self.angle + math.pi / 2) * speed
-            move_y += math.sin(self.angle + math.pi / 2) * speed
+        if target_block:
+            self.attack_cooldown = 30
+            target_block.hp -= 1
+            target_block.flash_timer = 5
+            if target_block.hp <= 0:
+                if target_block.type == TYPE_BASE:
+                    app.state = STATE_GAMEOVER
+                app.grid[gy][gx] = None
+            return
 
-        self.x = max(0, min(self.x + move_x, FIELD_WIDTH * TILE_SIZE - 1))
-        self.y = max(0, min(self.y + move_y, FIELD_HEIGHT * TILE_SIZE - 1))
-
-        if pyxel.btn(pyxel.KEY_SPACE) and self.frame_count % 3 == 0:
-            self.shoot_ink(self.x, self.y, self.angle, 9, "player")
-
-        if self.bomb_cooldown > 0:
-            self.bomb_cooldown -= 1
-        if pyxel.btnp(pyxel.KEY_Q) and self.bomb_cooldown == 0:
-            self.shoot_cursor_bomb()
-            self.bomb_cooldown = 180
-
-        for enemy in self.enemies:
-            if enemy["alive"] and self.frame_count % 60 == 0:
-                angle = math.atan2(self.y - enemy["y"], self.x - enemy["x"])
-                self.shoot_ink(enemy["x"], enemy["y"], angle, 8, "enemy")
-
-        new_particles = []
-        for p in self.ink_particles:
-            p["x"] += p["dx"]
-            p["y"] += p["dy"]
-            p["life"] -= 1
-
-            tx = int(p["x"]) // TILE_SIZE
-            ty = int(p["y"]) // TILE_SIZE
-            if 0 <= tx < FIELD_WIDTH and 0 <= ty < FIELD_HEIGHT:
-                self.field[ty][tx] = p["color"]
-
-            if p["owner"] == "player":
-                hit = False
-                for enemy in self.enemies:
-                    if enemy["alive"] and math.hypot(p["x"] - enemy["x"], p["y"] - enemy["y"]) < 6:
-                        enemy["hp"] -= 1
-                        if enemy["hp"] <= 0:
-                            enemy["alive"] = False
-                        hit = True
-                        break
-                if not hit and p["life"] > 0:
-                    new_particles.append(p)
-            elif p["owner"] == "enemy":
-                if math.hypot(p["x"] - self.x, p["y"] - self.y) < 6:
-                    self.hp -= 1
-                    if self.hp <= 0:
-                        self.alive = False
-                elif p["life"] > 0:
-                    new_particles.append(p)
-        self.ink_particles = new_particles
-
-        # 爆発エフェクトの寿命処理
-        self.explosions = [e for e in self.explosions if e["life"] > 0]
-        for e in self.explosions:
-            e["life"] -= 1
-
-    def shoot_ink(self, x, y, angle, color, owner):
-        for _ in range(10):
-            spread = random.uniform(-0.1, 0.1)
-            dx = math.cos(angle + spread) * random.uniform(2.0, 2.8)
-            dy = math.sin(angle + spread) * random.uniform(2.0, 2.8)
-            self.ink_particles.append({
-                "x": x + math.cos(angle) * 4,
-                "y": y + math.sin(angle) * 4,
-                "dx": dx,
-                "dy": dy,
-                "life": 20,
-                "color": color,
-                "owner": owner
-            })
-
-    def shoot_cursor_bomb(self):
-        cx = self.x - pyxel.width // 2 + pyxel.mouse_x
-        cy = self.y - pyxel.height // 2 + pyxel.mouse_y
-
-        # フィールド塗り
-        for y in range(FIELD_HEIGHT):
-            for x in range(FIELD_WIDTH):
-                tx = x * TILE_SIZE + TILE_SIZE // 2
-                ty = y * TILE_SIZE + TILE_SIZE // 2
-                if math.hypot(cx - tx, cy - ty) < 24:
-                    self.field[y][x] = 10
-
-        # 敵ダメージ
-        for enemy in self.enemies:
-            if enemy["alive"] and math.hypot(cx - enemy["x"], cy - enemy["y"]) < 24:
-                enemy["alive"] = False
-
-        # 爆発演出を登録
-        self.explosions.append({
-            "x": cx,
-            "y": cy,
-            "life": 20
-        })
+        dx = self.target_x - self.x
+        dy = self.target_y - self.y
+        dist = math.hypot(dx, dy)
+        if dist > 0:
+            self.x += (dx / dist) * self.speed
+            self.y += (dy / dist) * self.speed
 
     def draw(self):
-        pyxel.cls(0)
-        offset_x = int(self.x) - pyxel.width // 2
-        offset_y = int(self.y) - pyxel.height // 2
+        # Draw enemy even smaller - just a pixel
+        pyxel.pset(self.x, self.y, COL_ENEMY)
 
-        for y in range(FIELD_HEIGHT):
-            for x in range(FIELD_WIDTH):
-                c = self.field[y][x]
-                if c != 0:
-                    px = x * TILE_SIZE - offset_x
-                    py = y * TILE_SIZE - offset_y
-                    if 0 <= px < pyxel.width and 0 <= py < pyxel.height:
-                        pyxel.rect(px, py, TILE_SIZE, TILE_SIZE, c)
+class Projectile:
+    def __init__(self, x, y, target):
+        self.x = x
+        self.y = y
+        self.target = target
+        self.speed = 2.0
+        self.alive = True
 
-        # プレイヤー
-        px, py = pyxel.width // 2, pyxel.height // 2
-        pyxel.circ(px, py, 4, 7)
-        pyxel.line(px, py, px + math.cos(self.angle) * 6, py + math.sin(self.angle) * 6, 10)
+    def update(self):
+        if not self.target.alive:
+            self.alive = False
+            return
+        dx = self.target.x - self.x
+        dy = self.target.y - self.y
+        dist = math.hypot(dx, dy)
+        if dist < self.speed:
+            self.x = self.target.x
+            self.y = self.target.y
+            self.target.hp -= 1
+            if self.target.hp <= 0:
+                self.target.alive = False
+            self.alive = False
+        else:
+            self.x += (dx / dist) * self.speed
+            self.y += (dy / dist) * self.speed
 
-        # 敵
+    def draw(self):
+        pyxel.pset(self.x, self.y, COL_SHOT)
+
+class App:
+    def __init__(self):
+        pyxel.init(SCREEN_WIDTH, SCREEN_HEIGHT, title="Block Defense", fps=60)
+        pyxel.mouse(True)
+        self.reset_game()
+        pyxel.run(self.update, self.draw)
+
+    def reset_game(self):
+        self.state = STATE_TITLE
+        self.blocks = 100 # Lots of blocks for small size
+        self.grid = [[None for _ in range(GRID_W)] for _ in range(GRID_H)]
+        self.enemies = []
+        self.projectiles = []
+        self.wave = 1
+        self.spawn_timer = 0
+        self.base_x = GRID_W // 2
+        self.base_y = GRID_H // 2
+        self.selected_type = TYPE_WALL
+        
+        # Place 2x2 base
+        for dy in range(2):
+            for dx in range(2):
+                if 0 <= self.base_y + dy < GRID_H and 0 <= self.base_x + dx < GRID_W:
+                    self.grid[self.base_y + dy][self.base_x + dx] = Block(TYPE_BASE)
+
+    def update(self):
+        if self.state == STATE_TITLE:
+            if pyxel.btnp(pyxel.KEY_SPACE):
+                self.state = STATE_BUILD
+        
+        elif self.state == STATE_BUILD:
+            if pyxel.btnp(pyxel.KEY_1): self.selected_type = TYPE_WALL
+            if pyxel.btnp(pyxel.KEY_2): self.selected_type = TYPE_TURRET
+
+            if pyxel.btn(pyxel.MOUSE_BUTTON_LEFT): # Allow drag-placing
+                mx, my = pyxel.mouse_x // TILE_SIZE, pyxel.mouse_y // TILE_SIZE
+                if 0 <= mx < GRID_W and 0 <= my < GRID_H:
+                    current = self.grid[my][mx]
+                    if current is None:
+                        cost = COST_WALL if self.selected_type == TYPE_WALL else COST_TURRET
+                        if self.blocks >= cost:
+                            self.grid[my][mx] = Block(self.selected_type)
+                            self.blocks -= cost
+            
+            if pyxel.btnp(pyxel.MOUSE_BUTTON_RIGHT): # Right click to remove
+                mx, my = pyxel.mouse_x // TILE_SIZE, pyxel.mouse_y // TILE_SIZE
+                if 0 <= mx < GRID_W and 0 <= my < GRID_H:
+                    current = self.grid[my][mx]
+                    if current and current.type != TYPE_BASE:
+                        refund = COST_WALL if current.type == TYPE_WALL else COST_TURRET
+                        self.blocks += refund
+                        self.grid[my][mx] = None
+            
+            if pyxel.btnp(pyxel.KEY_RETURN):
+                self.state = STATE_DEFEND
+                self.spawn_timer = 0
+                self.enemies_to_spawn = 10 + self.wave * 5
+
+        elif self.state == STATE_DEFEND:
+            if self.enemies_to_spawn > 0:
+                self.spawn_timer += 1
+                if self.spawn_timer > 30: # Faster spawn for more enemies
+                    self.spawn_enemy()
+                    self.enemies_to_spawn -= 1
+                    self.spawn_timer = 0
+            
+            if self.enemies_to_spawn == 0 and not self.enemies:
+                self.wave += 1
+                self.blocks += 30
+                self.state = STATE_BUILD
+                return
+
+            for enemy in self.enemies:
+                enemy.update(self)
+
+            for proj in self.projectiles:
+                proj.update()
+
+            self.enemies = [e for e in self.enemies if e.alive]
+            self.projectiles = [p for p in self.projectiles if p.alive]
+
+            for y in range(GRID_H):
+                for x in range(GRID_W):
+                    if self.grid[y][x]:
+                        if self.grid[y][x].flash_timer > 0:
+                             self.grid[y][x].flash_timer -= 1
+
+            if pyxel.frame_count % 30 == 0:
+                for y in range(GRID_H):
+                    for x in range(GRID_W):
+                        blk = self.grid[y][x]
+                        if blk and blk.type == TYPE_TURRET:
+                            self.fire_turret(x * TILE_SIZE + TILE_SIZE/2, y * TILE_SIZE + TILE_SIZE/2)
+
+        elif self.state == STATE_GAMEOVER:
+            if pyxel.btnp(pyxel.KEY_SPACE):
+                self.reset_game()
+
+    def spawn_enemy(self):
+        side = random.randint(0, 3)
+        if side == 0: x, y = random.randint(0, SCREEN_WIDTH), -2
+        elif side == 1: x, y = random.randint(0, SCREEN_WIDTH), SCREEN_HEIGHT + 2
+        elif side == 2: x, y = -2, random.randint(0, SCREEN_HEIGHT)
+        else: x, y = SCREEN_WIDTH + 2, random.randint(0, SCREEN_HEIGHT)
+        self.enemies.append(Enemy(x, y, self.base_x * TILE_SIZE + 1, self.base_y * TILE_SIZE + 1))
+
+    def fire_turret(self, tx, ty):
+        closest, min_dist = None, 30
         for enemy in self.enemies:
-            if enemy["alive"]:
-                ex = enemy["x"] - offset_x
-                ey = enemy["y"] - offset_y
-                pyxel.circ(ex, ey, 4, 8)
-                angle = math.atan2(self.y - enemy["y"], self.x - enemy["x"])
-                pyxel.line(ex, ey, ex + math.cos(angle) * 6, ey + math.sin(angle) * 6, 11)
+            dist = math.hypot(enemy.x - tx, enemy.y - ty)
+            if dist < min_dist: min_dist, closest = dist, enemy
+        if closest: self.projectiles.append(Projectile(tx, ty, closest))
 
-        # 爆発エフェクト
-        for e in self.explosions:
-            ex = e["x"] - offset_x
-            ey = e["y"] - offset_y
-            r = e["life"]
-            pyxel.circ(ex, ey, r // 2 + 6, 10)
-            pyxel.circ(ex, ey, r // 3 + 4, 8)
+    def draw(self):
+        pyxel.cls(COL_BG)
+        if self.state == STATE_TITLE:
+            pyxel.text(55, 50, "DEFENSE", COL_TEXT)
+            pyxel.text(45, 70, "PRESS SPACE", COL_TEXT)
+            return
 
-        pyxel.text(2, 5, f"HP: {self.hp}", 7)
-        pyxel.text(2, 115, "SPACE: Ink  Q: Bomb", 6)
-        if not self.alive:
-            pyxel.text(55, 60, "GAME OVER", 8)
+        for y in range(GRID_H):
+            for x in range(GRID_W):
+                blk = self.grid[y][x]
+                if blk:
+                    color = COL_WALL
+                    if blk.type == TYPE_WALL and blk.hp <= 1: color = COL_WALL_LOW
+                    elif blk.type == TYPE_TURRET: color = COL_TURRET
+                    elif blk.type == TYPE_BASE: color = COL_BASE
+                    if blk.flash_timer > 0: color = COL_DAMAGE
+                    pyxel.rect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE, color)
 
-SplatoonCursorBomb()
+        if self.state == STATE_BUILD:
+            pyxel.text(2, 2, f"M:{self.blocks} W:{self.wave}", COL_TEXT)
+            sel_text = "WALL(1)" if self.selected_type == TYPE_WALL else "TURRET(2)"
+            pyxel.text(60, 2, sel_text, COL_WALL if self.selected_type == TYPE_WALL else COL_TURRET)
+            pyxel.text(120, 2, "ENTER:GO", COL_TEXT)
+            mx, my = pyxel.mouse_x // TILE_SIZE, pyxel.mouse_y // TILE_SIZE
+            if 0 <= mx < GRID_W and 0 <= my < GRID_H:
+                 pyxel.rectb(mx * TILE_SIZE, my * TILE_SIZE, TILE_SIZE, TILE_SIZE, COL_HOVER)
+        elif self.state == STATE_DEFEND:
+            pyxel.text(2, 2, f"WAVE: {self.wave}", COL_TEXT)
+            for e in self.enemies: e.draw()
+            for p in self.projectiles: p.draw()
+        elif self.state == STATE_GAMEOVER:
+            pyxel.text(60, 50, "GAME OVER", 8)
+            pyxel.text(50, 70, "PRESS SPACE", 7)
+
+App()
