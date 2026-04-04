@@ -1,73 +1,164 @@
+#pyxel edit ./mein0002/my_game.pyxres
 import pyxel
+import math
 
+# 初期設定
+pyxel.init(160, 120, fps=30)
+pyxel.load("my_game.pyxres")
+pyxel.playm(0, loop=True)
+
+# プレイヤー情報
 player_x = 80
-player_y = 80
-speed = 2
-player_size = 8
-player_color = 1
+player_y = 60
+facing = 0
+state = 0
+counter = 0
 
-base_speed = 2
-turbo_speed = 5
+# 敵の情報生成
+def make_enemy(x, y, hp, enemy_type, sprite_index):
+    enemy = {
+        "x": x,
+        "y": y,
+        "hp": hp,
+        "max_hp": hp,
+        "type": enemy_type,
+        "u": sprite_index,
+        "state": "alive",
+        "timer": 0
+    }
+    if enemy_type == "bat":
+        enemy["cx"] = x
+        enemy["cy"] = y
+    return enemy
 
-vy = 0            # 縦方向のスピード（下に+、上に-）
-gravity = 0.3     # 重力の強さ
-ground_y = 80     # 地面の高さ (= 立ってるときのY)
+enemies = [
+    make_enemy(30, 80, 30, "slime", 0),
+    make_enemy(130, 40, 50, "goblin", 1),
+    make_enemy(60, 20, 20, "bat", 2),
+]
 
-pyxel.init(160, 120)
+# 敵の動き
+def update_enemy_ai(enemy):
+    if enemy["type"] == "slime":
+        enemy["x"] += pyxel.rndi(-2, 2)
+        enemy["y"] += pyxel.rndi(-2, 2)
 
+    elif enemy["type"] == "goblin":
+        if enemy["x"] < player_x:
+            enemy["x"] += 1
+        elif enemy["x"] > player_x:
+            enemy["x"] -= 1
+
+        if enemy["y"] < player_y:
+            enemy["y"] += 1
+        elif enemy["y"] > player_y:
+            enemy["y"] -= 1
+
+    elif enemy["type"] == "bat":
+        a = (pyxel.frame_count + enemy["u"] * 30) * 0.1
+        enemy["x"] = enemy["cx"] + math.cos(a) * 30
+        enemy["y"] = enemy["cy"] + math.sin(a) * 20
+
+    # bat以外だけ画面内制限
+    if enemy["type"] != "bat":
+        enemy["x"] = max(0, min(160 - 16, enemy["x"]))
+        enemy["y"] = max(0, min(120 - 16, enemy["y"]))
+
+# 敵の状態
+def update_enemy_state(enemy):
+    if enemy["state"] == "alive" and enemy["hp"] <= 0:
+        enemy["state"] = "dying"
+        enemy["timer"] = 30
+
+    if enemy["state"] == "dying":
+        enemy["timer"] -= 1
+        if enemy["timer"] <= 0:
+            enemy["state"] = "dead"
+
+# 更新
 def update():
-    global player_x, player_y, vy,base_speed,turbo_speed,player_color
-    
-    if pyxel.btnp(pyxel.KEY_C):
-        player_color += 1
-    
-    if player_color == 12:
-        player_color = 0
+    global player_x, player_y, facing, state, counter
 
-    if pyxel.btnp(pyxel.KEY_R):
-        player_x = 80
-        player_y = ground_y  # = 80 と同じ。地面に戻す
-        vy = 0          
+    # プレイヤー移動
+    if pyxel.btn(pyxel.KEY_LEFT):
+        player_x -= 2
+        facing = 0
+    elif pyxel.btn(pyxel.KEY_RIGHT):
+        player_x += 2
+        facing = 1
+    elif pyxel.btn(pyxel.KEY_UP):
+        player_y -= 2
+        facing = 2
+    elif pyxel.btn(pyxel.KEY_DOWN):
+        player_y += 2
+        facing = 3
 
-    if pyxel.btn(pyxel.KEY_SHIFT):
-        speed = turbo_speed
-    else:
-        speed = base_speed
+    # 画面内制限
+    player_x = max(0, min(160 - 16, player_x))
+    player_y = max(0, min(120 - 16, player_y))
 
-    # ← →
-    if pyxel.btn(pyxel.KEY_RIGHT) or pyxel.btn(pyxel.KEY_D):
-        player_x += speed
-    if pyxel.btn(pyxel.KEY_LEFT) or pyxel.btn(pyxel.KEY_A):
-        player_x -= speed
+    # アニメーション
+    counter += 1
+    if counter >= 15:
+        counter = 0
+        state = 16 if state == 0 else 0
 
-    # スペースでジャンプ開始
-    # 条件: 地面にいるときだけジャンプできる（2段ジャンプ防止）
-    if pyxel.btnp(pyxel.KEY_SPACE):
-        if player_y >= ground_y:
-            vy = -5      # 上向きに初速を与える（マイナス方向が上）
-    
-    # 重力を速度に足す（落ちるほど速くなる）
-    vy += gravity
+    # 敵更新
+    for enemy in enemies:
+        if enemy["state"] == "alive":
+            update_enemy_ai(enemy)
+        update_enemy_state(enemy)
 
-    # 位置を更新
-    player_y += vy
+    # 攻撃
+    if pyxel.btnp(pyxel.KEY_A):
+        for enemy in enemies:
+            if enemy["state"] != "alive" or enemy["hp"] <= 0:
+                continue
 
-    # 地面より下に落ちたら、地面で止める
-    if player_y > ground_y:
-        player_y = ground_y
-        vy = 0  # 着地したので停止
+            dx = enemy["x"] - player_x
+            dy = enemy["y"] - player_y
 
-    # X座標の制限：左端(0)と右端(160)でチェック
-    
-    player_x = max(player_size, min(player_x, 160 - player_size))
-    player_y = max(player_size, min(player_y, 120 - player_size))
+            hit = False
+            if facing == 0:   # 左
+                hit = -16 < dx < 0 and abs(dy) < 12
+            elif facing == 1: # 右
+                hit = 0 < dx < 16 and abs(dy) < 12
+            elif facing == 2: # 上
+                hit = -16 < dy < 0 and abs(dx) < 12
+            elif facing == 3: # 下
+                hit = 0 < dy < 16 and abs(dx) < 12
+
+            if hit:
+                enemy["hp"] -= 5
+                break
+
+# 描画
 def draw():
-    pyxel.cls(0)
+    pyxel.cls(12)
 
-    # プレイヤーを描画（丸）
-    pyxel.circ(player_x, player_y, player_size,player_color)
+    # プレイヤー
+    if facing == 0:
+        pyxel.blt(player_x, player_y, 0, state, 0, -16, 16, 1)
+    elif facing == 1:
+        pyxel.blt(player_x, player_y, 0, state, 0, 16, 16, 1)
+    elif facing == 2:
+        pyxel.blt(player_x, player_y, 0, state, 16, 16, 16, 1)
+    elif facing == 3:
+        pyxel.blt(player_x, player_y, 0, state, 32, 16, 16, 1)
 
-    # 地面の目安ライン（見やすくする用）
-    pyxel.line(0, ground_y + 8, 160, ground_y + 8, 7)
+    # 敵
+    for enemy in enemies:
+        if enemy["state"] == "dead":
+            continue
 
+        v = 16 if enemy["state"] == "dying" else 0
+        pyxel.blt(enemy["x"], enemy["y"], 1, enemy["u"] * 16, v, 16, 16, 1)
+
+        # HPバー
+        if enemy["state"] == "alive":
+            w = int(16 * enemy["hp"] / enemy["max_hp"])
+            y = max(enemy["y"] - 4, 0)
+            pyxel.rect(enemy["x"], y, w, 2, 8)
+
+# 実行
 pyxel.run(update, draw)
