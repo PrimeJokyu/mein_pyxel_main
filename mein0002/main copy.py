@@ -17,7 +17,11 @@ character = {
     "is_attacking": False,  
     "animations": {
         "idle": [(0, 0), (16, 0)],
-        "attack": [(0, 48), (16, 48), (32, 48)]
+        "idleUP": [(0, 16), (16, 16)],
+        "idleDOWN": [(0, 32), (16, 32)],
+        "attack": [(0, 48), (16, 48), (32, 48)],
+        "attackUP": [(0, 64), (16, 64), (32, 64)],
+        "attackDOWN": [(0, 80), (16, 80), (32, 80)],
     }
 }
 
@@ -91,18 +95,37 @@ def update_character():
     c["animation_frame"] += 1
 
     # 移動
-    if pyxel.btn(pyxel.KEY_LEFT):
-        c["x"] -= 2
-        c["direction"] = -16
+    if not c["is_attacking"]:
+        if pyxel.btn(pyxel.KEY_LEFT):
+            c["x"] -= 2
+            c["direction"] = -16
+            c["current_animation"] = "idle"
 
-    elif pyxel.btn(pyxel.KEY_RIGHT):
-        c["x"] += 2
-        c["direction"] = 16
+    
+        elif pyxel.btn(pyxel.KEY_RIGHT):
+            c["x"] += 2
+            c["direction"] = 16
+            c["current_animation"] = "idle"
+
+        elif pyxel.btn(pyxel.KEY_UP):
+            c["y"] -= 2
+            c["current_animation"] = "idleUP"
+
+        elif pyxel.btn(pyxel.KEY_DOWN):
+            c["y"] += 2
+            c["current_animation"] = "idleDOWN"
 
     # 攻撃開始
     if pyxel.btnp(pyxel.KEY_SPACE) and not c["is_attacking"]:
         c["is_attacking"] = True
-        c["current_animation"] = "attack"
+
+        if c["current_animation"] == "idle":
+            c["current_animation"] = "attack"
+        elif c["current_animation"] == "idleUP":
+            c["current_animation"] = "attackUP"
+        elif c["current_animation"] == "idleDOWN":
+            c["current_animation"] = "attackDOWN"
+
         c["animation_frame"] = 0
 
     # 攻撃中処理
@@ -120,11 +143,15 @@ def update_character():
                 dy = enemy["y"] - c["y"]
 
                 hit = False
-
-                if c["direction"] == 16:
-                    hit = 0 < dx < 16 and abs(dy) < 12
-                elif c["direction"] == -16:
-                    hit = -16 < dx < 0 and abs(dy) < 12
+                if c["current_animation"] == "attack":
+                    if c["direction"] == 16:
+                        hit = 0 < dx < 16 and abs(dy) < 12
+                    elif c["direction"] == -16:
+                        hit = -16 < dx < 0 and abs(dy) < 12
+                elif c["current_animation"] == "attackUP":
+                    hit = -32 < dy < 0 and abs(dx) < 12
+                elif c["current_animation"] == "attackDOWN":
+                    hit = 0 < dy < 32 and abs(dx) < 12  
 
                 if hit:
                     enemy["hp"] -= 5
@@ -134,9 +161,6 @@ def update_character():
             c["is_attacking"] = False
             c["current_animation"] = "idle"
             c["animation_frame"] = 0
-
-    else:
-        c["current_animation"] = "idle"
 
 def draw_character():
     c = character
