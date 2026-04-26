@@ -8,6 +8,7 @@ pyxel.init(160, 120, fps=30)
 pyxel.load("my_game.pyxres")
 pyxel.playm(0, loop=True)
 
+# プレイヤーの情報
 character = {
     "x": 80,
     "y": 60,
@@ -18,9 +19,20 @@ character = {
     "is_attacking": False,  
     "animations": {
         "idle": [(0, 0), (16, 0)],
-        "attack": [(0, 48), (16, 48), (32, 48)]
+        "idleUP": [(0, 16), (16, 16)],
+        "idleDOWN": [(0, 32), (16, 32)],
+        "attack": [(0, 48), (16, 48), (32, 48)],
+        "attackUP": [(0, 64), (16, 64), (32, 64)],
+        "attackDOWN": [(0, 80), (16, 80), (32, 80)]
     }
 }
+
+# 敵の情報
+enemies = [
+    make_enemy(30, 80, 30, "slime", 0),
+    make_enemy(130, 40, 50, "goblin", 1),
+    make_enemy(60, 20, 20, "bat", 2),
+]
 
 # 敵の情報生成
 def make_enemy(x, y, hp, enemy_type, sprite_index):
@@ -39,11 +51,101 @@ def make_enemy(x, y, hp, enemy_type, sprite_index):
         enemy["cy"] = y
     return enemy
 
-enemies = [
-    make_enemy(30, 80, 30, "slime", 0),
-    make_enemy(130, 40, 50, "goblin", 1),
-    make_enemy(60, 20, 20, "bat", 2),
-]
+# プレイヤーの動き
+def update_character():
+
+    c = character
+
+    c["animation_frame"] += 1
+
+    # 移動
+    if not c["is_attacking"]:
+        if pyxel.btn(pyxel.KEY_LEFT):
+            c["x"] -= 2
+            c["direction"] = -16
+            c["current_animation"] = "idle"
+    
+        elif pyxel.btn(pyxel.KEY_RIGHT):
+            c["x"] += 2
+            c["direction"] = 16
+            c["current_animation"] = "idle"
+
+        elif pyxel.btn(pyxel.KEY_UP):
+            c["y"] -= 2
+            c["current_animation"] = "idleUP"
+
+        elif pyxel.btn(pyxel.KEY_DOWN):
+            c["y"] += 2
+            c["current_animation"] = "idleDOWN"
+
+    # 攻撃開始
+    if pyxel.btnp(pyxel.KEY_SPACE) and not c["is_attacking"]:
+        c["hit_done"] = False
+        c["is_attacking"] = True
+        prev_anim = c["current_animation"]
+
+        if prev_anim == "idle":
+            c["current_animation"] = "attack"
+        elif prev_anim == "idleUP":
+            c["current_animation"] = "attackUP"
+        elif prev_anim == "idleDOWN":
+            c["current_animation"] = "attackDOWN"
+
+        c["animation_frame"] = 0
+
+    # 攻撃中処理
+    if c["is_attacking"]:
+        frames = c["animations"][c["current_animation"]]
+        frame_index = (c["animation_frame"] // c["animation_speed"])
+
+        # 2フレーム目で当たり判定
+        if frame_index == 1 and not c["hit_done"]:
+            for enemy in enemies:
+                if enemy["state"] != "alive":
+                    continue
+
+                dx = enemy["x"] - c["x"]
+                dy = enemy["y"] - c["y"]
+                hit = False
+
+                if c["current_animation"] == "attack":
+                    if c["direction"] == 16:
+                        hit = 0 < dx < 16 and abs(dy) < 12
+                    else:
+                        hit = -16 < dx < 0 and abs(dy) < 12
+
+                elif c["current_animation"] == "attackUP":
+                    hit = -16 < dy < 0 and abs(dx) < 12
+
+                elif c["current_animation"] == "attackDOWN":
+                    hit = 0 < dy < 16 and abs(dx) < 12
+
+                if hit:
+                    enemy["hp"] -= 10
+
+            c["hit_done"] = True
+
+        # アニメーション終了判定（ここに入れるのが正解）
+        if frame_index >= len(frames):
+            c["is_attacking"] = False
+            c["animation_frame"] = 0
+
+            if c["current_animation"] == "attack":
+                c["current_animation"] = "idle"
+            elif c["current_animation"] == "attackUP":
+                c["current_animation"] = "idleUP"
+            elif c["current_animation"] == "attackDOWN":
+                c["current_animation"] = "idleDOWN"
+
+# プレイヤーの描画
+def draw_character():
+    c = character
+    # 現在のアニメーションフレームを取得
+    frames = c["animations"][c["current_animation"]]
+    frame_index = (c["animation_frame"] // c["animation_speed"]) % len(frames)
+    sprite_x, sprite_y = frames[frame_index]
+    pyxel.blt(c["x"], c["y"], 0, sprite_x, sprite_y, c["direction"], 16, 1)
+
 
 # 敵の動き
 def update_enemy_ai(enemy):
@@ -86,81 +188,14 @@ def update_enemy_state(enemy):
         if enemy["timer"] <= 0:
             enemy["state"] = "dead"
 
-def update_character():
-    c = character
-
-    c["animation_frame"] += 1
-
-    # 移動
-    if pyxel.btn(pyxel.KEY_LEFT):
-        c["x"] -= 2
-        c["direction"] = -16
-
-    elif pyxel.btn(pyxel.KEY_RIGHT):
-        c["x"] += 2
-        c["direction"] = 16
-
-    # 攻撃開始
-    if pyxel.btnp(pyxel.KEY_SPACE) and not c["is_attacking"]:
-        c["is_attacking"] = True
-        c["current_animation"] = "attack"
-        c["animation_frame"] = 0
-        if c["current_animation"] == "idle":
-            c["current_animation"] = "attack"
-        elif c["current_animation"] == "idleUP":
-            c["current_animation"] = "attackUP"
-        elif c["current_animation"] == "idleDOWN":
-            c["current_animation"] = "attackDOWN"
-
-    # 攻撃中処理
-    if c["is_attacking"]:
-        frames = c["animations"][c["current_animation"]]
-        frame_index = (c["animation_frame"] // c["animation_speed"])
-
-        # 2フレーム目で当たり判定
-        if frame_index == 1:
-            for enemy in enemies:
-                if enemy["state"] != "alive":
-                    continue
-
-                dx = enemy["x"] - c["x"]
-                dy = enemy["y"] - c["y"]
-                hit = False
-
-                if c["direction"] == 16:
-                    hit = 0 < dx < 16 and abs(dy) < 12
-                elif c["direction"] == -16:
-                    hit = -16 < dx < 0 and abs(dy) < 12
-
-                elif c["current_animation"] == "attackUP":
-                    hit = -16 < dy < 0 and abs(dx) < 12
-                elif c["current_animation"] == "attackDOWN":
-                    hit = 0 < dy < 16 and abs(dx) < 12
-                if hit:
-                    enemy["hp"] -= 5
-
-        # アニメーション終了
-        if frame_index >= len(frames):
-            c["is_attacking"] = False
-            c["current_animation"] = "idle"
-            c["animation_frame"] = 0
-
-def draw_character():
-    c = character
-    # 現在のアニメーションフレームを取得
-    frames = c["animations"][c["current_animation"]]
-    frame_index = (c["animation_frame"] // c["animation_speed"]) % len(frames)
-    sprite_x, sprite_y = frames[frame_index]
-    pyxel.blt(c["x"], c["y"], 0, sprite_x, sprite_y, c["direction"], 16, 1)
-
-
-# 敵更新
+# 敵の更新
 def update_enemy():
     for enemy in enemies:
         if enemy["state"] == "alive":
             update_enemy_ai(enemy)
         update_enemy_state(enemy)
 
+# 敵の描画
 def draw_enemy():
     for enemy in enemies:
         if enemy["state"] == "dead":
@@ -180,6 +215,7 @@ def update():
     update_character()
     update_enemy()
 
+# 描画
 def draw():
     pyxel.cls(12)
     draw_character()
