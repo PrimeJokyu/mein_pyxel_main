@@ -9,6 +9,8 @@ pyxel.load("my_game.pyxres")
 pyxel.playm(0, loop=True)
 
 # プレイヤーの情報
+a = ""
+random_int = 0
 character = {
     "x": 80,
     "y": 60,
@@ -56,6 +58,7 @@ enemies = [
 ]
 # プレイヤーの動き
 def update_character():
+    global a
 
     c = character
 
@@ -124,7 +127,7 @@ def update_character():
                     hit = 0 < dy < 16 and abs(dx) < 12
 
                 if hit:
-                    enemy["hp"] -= 10
+                    enemy["hp"] -= 10000000000000000000000000000
 
             c["hit_done"] = True
 
@@ -185,6 +188,14 @@ def update_enemy_state(enemy):
     if enemy["state"] == "alive" and enemy["hp"] <= 0:
         enemy["state"] = "dying"
         enemy["timer"] = 30
+        random_int = pyxel.rndi(0, 100)
+        if random_int >= 50:
+            a = "あたり"
+        else:
+            a = "はずれ"
+
+        pyxel.text(100, 100, a, 15)
+        print(random_int)
 
     if enemy["state"] == "dying":
         enemy["timer"] -= 1
@@ -223,6 +234,7 @@ def draw():
     pyxel.cls(12)
     draw_character()
     draw_enemy()
+    pyxel.text(100, 100, str(a), 15)
 
 
 # 実行
