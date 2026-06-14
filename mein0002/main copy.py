@@ -1,84 +1,123 @@
 import pyxel
+import random
 
-pyxel.init(160, 120, fps=3)
-
-falling_objects = []
-
-
-def weighted_choice(weights):
-    total = sum(weights.values())
-    r = pyxel.rndi(1, total)
-
-    current = 0
-    for key, weight in weights.items():
-        current += weight
-        if r <= current:
-            return key
+object_pool_active = []
+object_pool_inactive = []
+object_pool_max = 100
 
 
-def spawn_object():
-    new_object = {
-        "x": pyxel.rndi(0, 159),
-        "y": -10,
-        "speed": pyxel.rndf(1.0, 4.0),
-        "color": pyxel.rndi(8, 15),
-        "size": pyxel.rndi(3, 8),
-        "type": weighted_choice({
-            "star": 60,
-            "heart": 30,
-            "diamond": 10
-        })
+def pool_create_empty_object():
+    return {
+        "x": 0, "y": 0, "active": False,
+        "speed": 0, "color": 0, "size": 0, "type": ""
     }
-    falling_objects.append(new_object)
 
 
-def update_objects():
-    for obj in falling_objects:
+def pool_init(max_objects=100):
+    global object_pool_max
+    object_pool_max = max_objects
+    object_pool_active.clear()
+    object_pool_inactive.clear()
+    for _ in range(max_objects):
+        object_pool_inactive.append(pool_create_empty_object())
+
+
+def pool_spawn(x, y, object_type):
+    if object_pool_inactive:
+        obj = object_pool_inactive.pop()
+        obj.update({
+            "x": x, "y": y, "active": True,
+            "speed": pyxel.rndf(1.0, 4.0),
+            "color": pyxel.rndi(8, 15),
+            "size": pyxel.rndi(3, 8),
+            "type": object_type
+        })
+        object_pool_active.append(obj)
+        return obj
+    return None
+
+
+def pool_despawn(obj):
+    if obj in object_pool_active:
+        obj["active"] = False
+        object_pool_active.remove(obj)
+        object_pool_inactive.append(obj)
+
+
+def pool_update():
+    to_remove = []
+
+    for obj in object_pool_active:
         obj["y"] += obj["speed"]
 
-    falling_objects[:] = [
-        obj for obj in falling_objects
-        if obj["y"] < 130
-    ]
+        if obj["y"] > 130:
+            to_remove.append(obj)
+
+    for obj in to_remove:
+        pool_despawn(obj)
 
 
-def draw_star(x, y, size, color):
-    pyxel.circ(x, y, size, color)
-    pyxel.line(x - size, y, x + size, y, 7)
-    pyxel.line(x, y - size, x, y + size, 7)
+# ここ追加（あなたのコードに不足していた部分）
+def weighted_choice(weight_dict):
+    items = []
+    for k, v in weight_dict.items():
+        items += [k] * v
+    return random.choice(items)
 
 
-def draw_heart(x, y, size, color):
-    pyxel.circ(x - size // 2, y - size // 2, size // 2, color)
-    pyxel.circ(x + size // 2, y - size // 2, size // 2, color)
-    pyxel.tri(x - size, y, x, y + size, x + size, y, color)
+def spawn_random_object():
+    x = pyxel.rndi(0, 160)
+    object_type = weighted_choice({"star": 60, "heart": 30, "diamond": 10})
+    pool_spawn(x, -10, object_type)
 
 
-def draw_diamond(x, y, size, color):
-    pyxel.tri(x, y - size, x - size, y, x + size, y, color)
-    pyxel.tri(x - size, y, x, y + size, x + size, y, color)
+# =========================
+# Pyxel本体
+# =========================
+
+class App:
+    def __init__(self):
+        pyxel.init(160, 120)
+        pool_init(100)
+        pyxel.run(self.update, self.draw)
+
+    def update(self):
+        # 定期的に生成
+        if pyxel.frame_count % 10 == 0:
+            spawn_random_object()
+
+        pool_update()
+
+    def draw(self):
+        pyxel.cls(0)
+
+        for obj in object_pool_active:
+            if obj["type"] == "star":
+                pyxel.circ(obj["x"], obj["y"], obj["size"], obj["color"])
+
+            elif obj["type"] == "heart":
+                pyxel.circ(obj["x"] - 2, obj["y"], obj["size"] // 2, obj["color"])
+                pyxel.circ(obj["x"] + 2, obj["y"], obj["size"] // 2, obj["color"])
+                pyxel.tri(
+                    obj["x"] - obj["size"], obj["y"],
+                    obj["x"], obj["y"] + obj["size"],
+                    obj["x"] + obj["size"], obj["y"],
+                    obj["color"]
+                )
+
+            elif obj["type"] == "diamond":
+                pyxel.tri(
+                    obj["x"], obj["y"] - obj["size"],
+                    obj["x"] - obj["size"], obj["y"],
+                    obj["x"] + obj["size"], obj["y"],
+                    obj["color"]
+                )
+                pyxel.tri(
+                    obj["x"] - obj["size"], obj["y"],
+                    obj["x"], obj["y"] + obj["size"],
+                    obj["x"] + obj["size"], obj["y"],
+                    obj["color"]
+                )
 
 
-def draw_objects():
-    for obj in falling_objects:
-        if obj["type"] == "star":
-            draw_star(obj["x"], obj["y"], obj["size"], obj["color"])
-        elif obj["type"] == "heart":
-            draw_heart(obj["x"], obj["y"], obj["size"], obj["color"])
-        elif obj["type"] == "diamond":
-            draw_diamond(obj["x"], obj["y"], obj["size"], obj["color"])
-
-
-def update():
-    if pyxel.frame_count % 5 == 0:  # 出現頻度を調整
-        spawn_object()
-
-    update_objects()
-
-
-def draw():
-    pyxel.cls(0)
-    draw_objects()
-
-
-pyxel.run(update, draw)
+App()
