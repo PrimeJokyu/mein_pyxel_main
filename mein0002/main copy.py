@@ -1,123 +1,94 @@
 import pyxel
-import random
 
-object_pool_active = []
-object_pool_inactive = []
-object_pool_max = 100
-
-
-def pool_create_empty_object():
+def create_physics_object(x, y):
     return {
-        "x": 0, "y": 0, "active": False,
-        "speed": 0, "color": 0, "size": 0, "type": ""
+        "x": x, "y": y,
+        "velocity_x": pyxel.rndf(-3.0, 3.0),  # 横方向の初期速度
+        "velocity_y": 0,                       # 縦方向の初期速度
+        "gravity": 0.2,                       # 重力加速度
+        "bounce": 0.7,                        # 跳ね返り係数
+        "friction": 0.98                      # 空気抵抗
     }
 
+def update_physics_object(obj):
+    # 重力を適用
+    obj["velocity_y"] += obj["gravity"]
 
-def pool_init(max_objects=100):
-    global object_pool_max
-    object_pool_max = max_objects
-    object_pool_active.clear()
-    object_pool_inactive.clear()
-    for _ in range(max_objects):
-        object_pool_inactive.append(pool_create_empty_object())
+    # 空気抵抗を適用
+    obj["velocity_x"] *= obj["friction"]
 
+    # 位置を更新
+    obj["x"] += obj["velocity_x"]
+    obj["y"] += obj["velocity_y"]
 
-def pool_spawn(x, y, object_type):
-    if object_pool_inactive:
-        obj = object_pool_inactive.pop()
-        obj.update({
-            "x": x, "y": y, "active": True,
-            "speed": pyxel.rndf(1.0, 4.0),
-            "color": pyxel.rndi(8, 15),
-            "size": pyxel.rndi(3, 8),
-            "type": object_type
-        })
-        object_pool_active.append(obj)
-        return obj
-    return None
+    # 地面との当たり判定
+    if obj["y"] > 110:  # 地面の高さ
+        obj["y"] = 110
+        obj["velocity_y"] = -obj["velocity_y"] * obj["bounce"]  # 跳ね返り
+
+    # 左右の壁との当たり判定
+    if obj["x"] < 0 or obj["x"] > 160:
+        obj["velocity_x"] = -obj["velocity_x"] * obj["bounce"]
+        obj["x"] = max(0, min(obj["x"], 160))
 
 
-def pool_despawn(obj):
-    if obj in object_pool_active:
-        obj["active"] = False
-        object_pool_active.remove(obj)
-        object_pool_inactive.append(obj)
+def create_projectile(start_x, start_y, target_x, target_y, flight_time=60):
+    """指定された時間で目標地点に到達する放物線軌道"""
+    dx = target_x - start_x
+    dy = target_y - start_y
 
+    # 初期速度を計算
+    velocity_x = dx / flight_time
+    velocity_y = dy / flight_time - 0.5 * 0.2 * flight_time  # 重力を考慮
 
-def pool_update():
-    to_remove = []
+    return {
+        "x": start_x, "y": start_y,
+        "velocity_x": velocity_x,
+        "velocity_y": velocity_y,
+        "gravity": 0.2,
+        "time": 0
+    }
 
-    for obj in object_pool_active:
-        obj["y"] += obj["speed"]
+def update_projectile(proj):
+    proj["time"] += 1
 
-        if obj["y"] > 130:
-            to_remove.append(obj)
+    proj["x"] += proj["velocity_x"]
+    proj["y"] += proj["velocity_y"]
+    proj["velocity_y"] += proj["gravity"]
 
-    for obj in to_remove:
-        pool_despawn(obj)
+    # スペースキーで発射
+    if pyxel.btnp(pyxel.KEY_SPACE):
+        return create_projectile(
+            obj["x"],
+            obj["y"],
+            pyxel.mouse_x,
+            pyxel.mouse_y
+        )
 
+    # 画面の下に行ったらランダム発射
+    if proj["y"] > 120:
+        return create_projectile(
+            20,
+            100,
+            pyxel.rndi(20, 140),
+            pyxel.rndi(20, 100)
+        )
 
-# ここ追加（あなたのコードに不足していた部分）
-def weighted_choice(weight_dict):
-    items = []
-    for k, v in weight_dict.items():
-        items += [k] * v
-    return random.choice(items)
+    return proj
+def update():
+    global projectile
 
+    update_physics_object(obj)
+    projectile = update_projectile(projectile)
 
-def spawn_random_object():
-    x = pyxel.rndi(0, 160)
-    object_type = weighted_choice({"star": 60, "heart": 30, "diamond": 10})
-    pool_spawn(x, -10, object_type)
+def draw():
+    pyxel.cls(0)
+    pyxel.circ(int(obj["x"]), int(obj["y"]), 5, 8)
+    pyxel.circ(int(projectile["x"]), int(projectile["y"]), 3, 10)
+    pyxel.circ(pyxel.mouse_x, pyxel.mouse_y, 1, 7)
 
+pyxel.init(160, 120, title="Physics Demo")
 
-# =========================
-# Pyxel本体
-# =========================
-
-class App:
-    def __init__(self):
-        pyxel.init(160, 120)
-        pool_init(100)
-        pyxel.run(self.update, self.draw)
-
-    def update(self):
-        # 定期的に生成
-        if pyxel.frame_count % 10 == 0:
-            spawn_random_object()
-
-        pool_update()
-
-    def draw(self):
-        pyxel.cls(0)
-
-        for obj in object_pool_active:
-            if obj["type"] == "star":
-                pyxel.circ(obj["x"], obj["y"], obj["size"], obj["color"])
-
-            elif obj["type"] == "heart":
-                pyxel.circ(obj["x"] - 2, obj["y"], obj["size"] // 2, obj["color"])
-                pyxel.circ(obj["x"] + 2, obj["y"], obj["size"] // 2, obj["color"])
-                pyxel.tri(
-                    obj["x"] - obj["size"], obj["y"],
-                    obj["x"], obj["y"] + obj["size"],
-                    obj["x"] + obj["size"], obj["y"],
-                    obj["color"]
-                )
-
-            elif obj["type"] == "diamond":
-                pyxel.tri(
-                    obj["x"], obj["y"] - obj["size"],
-                    obj["x"] - obj["size"], obj["y"],
-                    obj["x"] + obj["size"], obj["y"],
-                    obj["color"]
-                )
-                pyxel.tri(
-                    obj["x"] - obj["size"], obj["y"],
-                    obj["x"], obj["y"] + obj["size"],
-                    obj["x"] + obj["size"], obj["y"],
-                    obj["color"]
-                )
-
-
-App()
+obj = create_physics_object(80, 60)
+projectile = create_projectile(20, 100, 140, 40)
+pyxel.run(update, draw)
