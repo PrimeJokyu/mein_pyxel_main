@@ -1,119 +1,243 @@
-#python -m pyxel edit my_game.pyxres
+#pyxel edit ./mein0002/my_game.pyxres
+#python -m pyxel edit ./mein0002/my_game.pyxres
 import pyxel
-player_x = 80
-player_y = 60
-facing = 0
-state = 0
-counter = 0
+import math
 
-enemies = [
-    {"x": 30, "y": 80, "hp": 30, "type": "slime", "death": 0,"death_timer": 0,"done":False},
-    {"x": 130, "y": 40, "hp": 50, "type": "goblin", "death": 0,"death_timer": 0,"done":False},
-    {"x": 60, "y": 20, "hp": 20, "type": "bat", "death": 0,"death_timer": 0,"done":False}
-]
-
+# 初期設定
 pyxel.init(160, 120, fps=30)
 pyxel.load("my_game.pyxres")
+pyxel.playm(0, loop=True)
 
-def update():
-    global player_x, facing,player_y,counter, state
+# プレイヤーの情報
+a = "a"
+random_int = 0
+character = {
+    "x": 80,
+    "y": 60,
+    "direction": 16,
+    "animation_frame": 0,
+    "animation_speed": 10,
+    "current_animation": "idle",
+    "is_attacking": False,  
+    "animations": {
+        "idle": [(0, 0), (16, 0)],
+        "idleUP": [(0, 16), (16, 16)],
+        "idleDOWN": [(0, 32), (16, 32)],
+        "attack": [(0, 48), (16, 48), (32, 48)],
+        "attackUP": [(0, 64), (16, 64), (32, 64)],
+        "attackDOWN": [(0, 80), (16, 80), (32, 80)]
+    }
+}
 
 
-    if pyxel.btn(pyxel.KEY_LEFT):
-        player_x -= 2
-        facing = 0
-    elif pyxel.btn(pyxel.KEY_RIGHT):
-        player_x += 2
-        facing = 1
-    elif pyxel.btn(pyxel.KEY_UP):
-        player_y -= 2
-        facing = 2
-    elif pyxel.btn(pyxel.KEY_DOWN):
-        player_y += 2
-        facing = 3
+# 敵の情報生成
+def make_enemy(x, y, hp, enemy_type, sprite_index):
+    enemy = {
+        "x": x,
+        "y": y,
+        "hp": hp,
+        "max_hp": hp,
+        "type": enemy_type,
+        "u": sprite_index,
+        "state": "alive",
+        "timer": 0
+    }
 
-    counter += 1
-    if counter >= 15:          # fps=1 なので 1フレーム=1秒
-        counter = 0
-        state = 16 if state == 0 else 0
-        
+    if enemy_type == "bat":
+        enemy["cx"] = x
+        enemy["cy"] = y
+
+    return enemy
+
+
+# enemies作成
+enemies = [
+    make_enemy(30, 80, 30, "slime", 0),
+    make_enemy(130, 40, 50, "goblin", 1),
+    make_enemy(60, 20, 20, "bat", 2),
+]
+
+# プレイヤーの動き
+def update_character():
+    global a
+
+    c = character
+
+    c["animation_frame"] += 1
+    c["animation_frame"] %= 1000
+
+    # 移動
+    if not c["is_attacking"]:
+        if pyxel.btn(pyxel.KEY_LEFT):
+            c["x"] -= 2
+            c["direction"] = -16
+            c["current_animation"] = "idle"
+    
+        elif pyxel.btn(pyxel.KEY_RIGHT):
+            c["x"] += 2
+            c["direction"] = 16
+            c["current_animation"] = "idle"
+
+        elif pyxel.btn(pyxel.KEY_UP):
+            c["y"] -= 2
+            c["current_animation"] = "idleUP"
+
+        elif pyxel.btn(pyxel.KEY_DOWN):
+            c["y"] += 2
+            c["current_animation"] = "idleDOWN"
+
+    # 攻撃開始
+    if pyxel.btnp(pyxel.KEY_SPACE) and not c["is_attacking"]:
+        c["hit_done"] = False
+        c["is_attacking"] = True
+        prev_anim = c["current_animation"]
+
+        if prev_anim == "idle":
+            c["current_animation"] = "attack"
+        elif prev_anim == "idleUP":
+            c["current_animation"] = "attackUP"
+        elif prev_anim == "idleDOWN":
+            c["current_animation"] = "attackDOWN"
+
+        c["animation_frame"] = 0
+
+    # 攻撃中処理
+    if c["is_attacking"]:
+        frames = c["animations"][c["current_animation"]]
+        frame_index = (c["animation_frame"] // c["animation_speed"])
+
+        # 2フレーム目で当たり判定
+        if frame_index == 1 and not c["hit_done"]:
+            for enemy in enemies:
+                if enemy["state"] != "alive":
+                    continue
+
+                dx = enemy["x"] - c["x"]
+                dy = enemy["y"] - c["y"]
+                hit = False
+
+                if c["current_animation"] == "attack":
+                    if c["direction"] == 16:
+                        hit = 0 < dx < 16 and abs(dy) < 12
+                    else:
+                        hit = -16 < dx < 0 and abs(dy) < 12
+
+                elif c["current_animation"] == "attackUP":
+                    hit = -16 < dy < 0 and abs(dx) < 12
+
+                elif c["current_animation"] == "attackDOWN":
+                    hit = 0 < dy < 16 and abs(dx) < 12
+
+                if hit:
+                    enemy["hp"] -= 10000000000000000000000000000
+
+            c["hit_done"] = True
+
+        # アニメーション終了判定（ここに入れるのが正解）
+        if frame_index >= len(frames):
+            c["is_attacking"] = False
+            c["animation_frame"] = 0
+
+            if c["current_animation"] == "attack":
+                c["current_animation"] = "idle"
+            elif c["current_animation"] == "attackUP":
+                c["current_animation"] = "idleUP"
+            elif c["current_animation"] == "attackDOWN":
+                c["current_animation"] = "idleDOWN"
+
+# プレイヤーの描画
+def draw_character():
+    c = character
+    # 現在のアニメーションフレームを取得
+    frames = c["animations"][c["current_animation"]]
+    frame_index = (c["animation_frame"] // c["animation_speed"]) % len(frames)
+    sprite_x, sprite_y = frames[frame_index]
+    pyxel.blt(c["x"], c["y"], 0, sprite_x, sprite_y, c["direction"], 16, 1)
+
+
+# 敵の動き
+def update_enemy_ai(enemy):
+
+    c = character
+
+    if enemy["type"] == "slime":
+        enemy["x"] += pyxel.rndi(-2, 2)
+        enemy["y"] += pyxel.rndi(-2, 2)
+
+    elif enemy["type"] == "goblin":
+        if enemy["x"] < c["x"]:
+            enemy["x"] += 1
+        elif enemy["x"] > c["x"]:
+            enemy["x"] -= 1
+
+        if enemy["y"] < c["y"]:
+            enemy["y"] += 1
+        elif enemy["y"] > c["y"]:
+            enemy["y"] -= 1
+
+    elif enemy["type"] == "bat":
+        a = (pyxel.frame_count + enemy["u"] * 30) * 0.1
+        enemy["x"] = enemy["cx"] + math.cos(a) * 30
+        enemy["y"] = enemy["cy"] + math.sin(a) * 20
+
+    # bat以外だけ画面内制限
+    if enemy["type"] != "bat":
+        enemy["x"] = max(0, min(160 - 16, enemy["x"]))
+        enemy["y"] = max(0, min(120 - 16, enemy["y"]))
+
+# 敵の状態
+def update_enemy_state(enemy):
+    global random_int, a
+    if enemy["state"] == "alive" and enemy["hp"] <= 0:
+        enemy["state"] = "dying"
+        enemy["timer"] = 30
+        random_int = pyxel.rndi(0, 100)
+        if random_int >= 50:
+            a = "atari"
+        else:
+            a = "hazure"
+
+        print(random_int)
+
+    if enemy["state"] == "dying":
+        enemy["timer"] -= 1
+        if enemy["timer"] <= 0:
+            enemy["state"] = "dead"
+
+# 敵の更新
+def update_enemy():
     for enemy in enemies:
+        if enemy["state"] == "alive":
+            update_enemy_ai(enemy)
+        update_enemy_state(enemy)
 
-        # ===== 移動処理 =====
-        if enemy["type"] == "slime":
-            enemy["x"] += pyxel.rndi(-3, 3)
+# 敵の描画
+def draw_enemy():
+    for enemy in enemies:
+        if enemy["state"] == "dead":
+            continue
 
-        elif enemy["type"] == "goblin":
-            if enemy["x"] < player_x:
-                enemy["x"] += 1
-            elif enemy["x"] > player_x:
-                enemy["x"] -= 1
+        v = 16 if enemy["state"] == "dying" else 0
+        pyxel.blt(enemy["x"], enemy["y"], 1, enemy["u"] * 16, v, 16, 16, 1)
 
-        elif enemy["type"] == "bat":
-            import math
-            angle = pyxel.frame_count * 0.1
-            enemy["x"] = 80 + math.cos(angle) * 30
-            enemy["y"] = 60 + math.sin(angle) * 20
+        # HPバー
+        if enemy["state"] == "alive":
+            w = int(16 * enemy["hp"] / enemy["max_hp"])
+            y = max(enemy["y"] - 4, 0)
+            pyxel.rect(enemy["x"], y, w, 2, 8)
 
+# 更新
+def update():
+    update_character()
+    update_enemy()
 
-        # ===== 死亡トリガー（1回だけ）=====
-        if enemy["hp"] == 0 and not enemy["done"]:
-            enemy["death"] = 16
-            enemy["death_timer"] = 30
-            enemy["done"] = True
-
-
-        # ===== 死亡タイマー =====
-        if enemy["done"]:
-            enemy["death_timer"] -= 1
-            if enemy["death_timer"] <= 0:
-                enemy["death"] = 32
-
-
-
-
-    # A を押したら、プレイヤーに近い敵の HP を 5 減らす（連打防止で1押し1回）
-    if pyxel.btnp(pyxel.KEY_A):
-        hit_range = 16  # 当たり判定の距離（ピクセル）
-        for enemy in enemies:
-            dx = enemy["x"] - player_x
-            dy = enemy["y"] - player_y
-            if dx * dx + dy * dy <= hit_range * hit_range:
-                enemy["hp"] -= 5
-                if enemy["hp"] <= 0:
-                    enemy["hp"] = 0
-                break  # 1回の攻撃で1体だけ削る
-
-
-
+# 描画
 def draw():
     pyxel.cls(12)
-    # 向きに応じてスプライトを反転
-    
-    if facing == 0:
-        pyxel.blt(player_x, player_y, 0, state, 0, -16, 16, 1)
-    elif facing == 1:
-        pyxel.blt(player_x, player_y, 0, state, 0, 16, 16, 1)  # 幅を負数で反転
-    elif facing == 2:
-        pyxel.blt(player_x, player_y, 0, state, 16, 16, 16, 1)  # 高さを負数で反転
-    elif facing == 3:
-        pyxel.blt(player_x, player_y, 0, state, 32, 16, 16, 1)  # 幅と高さを負数で反転
+    draw_character()
+    draw_enemy()
+    pyxel.text(5, 5, str(a), 15)
 
 
-
-    for enemy in enemies:
-        # 敵の種類に応じたスプライト表示
-        if enemy["type"] == "slime":
-            pyxel.blt(enemy["x"], enemy["y"], 1, 0, enemy["death"], 16, 16, 1)
-        elif enemy["type"] == "goblin":
-            pyxel.blt(enemy["x"], enemy["y"], 1, 16, enemy["death"], 16, 16, 1)
-        elif enemy["type"] == "bat":
-            pyxel.blt(enemy["x"], enemy["y"], 1, 32, enemy["death"], 16, 16, 1)
-
-        # HPバーの表示
-        bar_width = enemy["hp"] // 5
-        pyxel.rect(enemy["x"], enemy["y"] - 5, bar_width, 2, 8)
-
-
-pyxel.playm(0, loop=True)  # MUSIC 0 をループ再生
+# 実行
 pyxel.run(update, draw)

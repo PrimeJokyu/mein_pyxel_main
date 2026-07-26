@@ -1,0 +1,63 @@
+name: Build and Deploy Pyxel Web App
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: # 手動実行も可能にします
+
+# GitHub Pagesへのデプロイに必要な権限設定
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyxel
+
+      - name: Build Pyxel Web App
+        run: |
+          cd mein0012
+          python -m pyxel package . main.py
+          python -m pyxel app2html mein0012.pyxapp
+          
+      - name: Prepare Deployment Directory
+        run: |
+          mkdir public
+          # 作成したHTMLファイルをindex.htmlとしてpublicフォルダにコピーします
+          cp mein0012/mein0012.html public/index.html
+
+      # ビルドされたファイルをアーティファクトとしてアップロードします
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

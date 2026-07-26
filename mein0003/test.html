@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>トースト機能のデモ</title>
+    <!-- Google Fonts の読み込み -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- トースト用CSSの読み込み -->
+    <link rel="stylesheet" href="toast.css">
+    <style>
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: #f8fafc;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            color: #334155;
+        }
+
+        .container {
+            text-align: center;
+            background: white;
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            max-width: 500px;
+            width: 100%;
+        }
+
+        h1 {
+            margin-top: 0;
+            font-size: 24px;
+            color: #0f172a;
+            margin-bottom: 24px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        button.trigger-btn {
+            padding: 12px 24px;
+            font-size: 15px;
+            font-weight: 500;
+            color: white;
+            background-color: #6366f1;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(99, 102, 241, 0.2);
+            transition: all 0.2s ease;
+        }
+
+        button.trigger-btn:hover {
+            background-color: #4f46e5;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 8px rgba(99, 102, 241, 0.3);
+        }
+
+        button.trigger-btn:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(99, 102, 241, 0.2);
+        }
+
+        button.trigger-btn.success { background-color: #10b981; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.2); }
+        button.trigger-btn.success:hover { background-color: #059669; }
+        
+        button.trigger-btn.error { background-color: #ef4444; box-shadow: 0 4px 6px rgba(239, 68, 68, 0.2); }
+        button.trigger-btn.error:hover { background-color: #dc2626; }
+        
+        button.trigger-btn.info { background-color: #3b82f6; box-shadow: 0 4px 6px rgba(59, 130, 246, 0.2); }
+        button.trigger-btn.info:hover { background-color: #2563eb; }
+        
+        button.trigger-btn.warning { background-color: #f59e0b; box-shadow: 0 4px 6px rgba(245, 158, 11, 0.2); }
+        button.trigger-btn.warning:hover { background-color: #d97706; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>トースト機能ライブラリのデモ</h1>
+        <p style="margin-bottom: 24px; color: #64748b;">以下のボタンをクリックして、外部化されたToastライブラリの動作を確認してください。</p>
+        <div class="button-group">
+            <button class="trigger-btn success" onclick="Toast.success('保存に成功しました！')">Success</button>
+            <button class="trigger-btn error" onclick="Toast.error('エラーが発生しました。再試行してください。')">Error</button>
+            <button class="trigger-btn info" onclick="Toast.info('新しいメッセージが1件あります。')">Info</button>
+            <button class="trigger-btn warning" onclick="Toast.warning('ファイルサイズが制限に近づいています。')">Warning</button>
+        </div>
+    </div>
+
+    <!-- トースト用JSの読み込み -->
+    <script src="toast.js"></script>
+</body>
+</html>
