@@ -1,268 +1,94 @@
 import pyxel
 
-# =========================
-# 初期設定
-# =========================
+def create_physics_object(x, y):
+    return {
+        "x": x, "y": y,
+        "velocity_x": pyxel.rndf(-3.0, 3.0),  # 横方向の初期速度
+        "velocity_y": 0,                       # 縦方向の初期速度
+        "gravity": 0.2,                       # 重力加速度
+        "bounce": 0.7,                        # 跳ね返り係数
+        "friction": 0.98                      # 空気抵抗
+    }
 
-SCREEN_WIDTH = 160
-SCREEN_HEIGHT = 120
+def update_physics_object(obj):
+    # 重力を適用
+    obj["velocity_y"] += obj["gravity"]
 
-pyxel.init(SCREEN_WIDTH, SCREEN_HEIGHT, title="Monster Library")
-pyxel.load("my_game.pyxres")
+    # 空気抵抗を適用
+    obj["velocity_x"] *= obj["friction"]
 
-current_character = 0
-detail_mode = False
+    # 位置を更新
+    obj["x"] += obj["velocity_x"]
+    obj["y"] += obj["velocity_y"]
 
-characters = [
-    {
-        "name": "Slime",
-        "hp": 30,
-        "mp": 0,
-        "skill": "Bounce",
-        "sprite_x": 0,
-        "sprite_y": 0,
-        "color": 11,
-        "description": "Most famous slime in the world."
-    },
-    {
-        "name": "Dracky",
-        "hp": 20,
-        "mp": 20,
-        "skill": "Sleep",
-        "sprite_x": 16,
-        "sprite_y": 0,
-        "color": 13,
-        "description": "A small vampire monster."
-    },
-    {
-        "name": "Chimera",
-        "hp": 60,
-        "mp": 30,
-        "skill": "Fire",
-        "sprite_x": 32,
-        "sprite_y": 0,
-        "color": 10,
-        "description": "A flying beast with fire breath."
-    },
-    {
-        "name": "Giant Scorpion",
-        "hp": 80,
-        "mp": 10,
-        "skill": "Poison",
-        "sprite_x": 48,
-        "sprite_y": 0,
-        "color": 8,
-        "description": "A deadly giant scorpion."
-    },
-    {
-        "name": "Golem",
-        "hp": 100,
-        "mp": 0,
-        "skill": "Punch",
-        "sprite_x": 64,
-        "sprite_y": 0,
-        "color": 5,
-        "description": "A giant stone monster."
-    },
-    {
-        "name": "Dragon",
-        "hp": 200,
-        "mp": 0,
-        "skill": "Flame",
-        "sprite_x": 80,
-        "sprite_y": 0,
-        "color": 9,
-        "description": "A legendary fire dragon."
-    },
-    {
-        "name": "Dragon King",
-        "hp": 200,
-        "mp": 100,
-        "skill": "Inferno",
-        "sprite_x": 96,
-        "sprite_y": 0,
-        "color": 14,
-        "description": "The king of dragons."
-    },
-    {
-        "name": "Metal Slime",
-        "hp": 4,
-        "mp": 30,
-        "skill": "Escape",
-        "sprite_x": 112,
-        "sprite_y": 0,
-        "color": 7,
-        "description": "Extremely hard to defeat."
-    },
-]
+    # 地面との当たり判定
+    if obj["y"] > 110:  # 地面の高さ
+        obj["y"] = 110
+        obj["velocity_y"] = -obj["velocity_y"] * obj["bounce"]  # 跳ね返り
 
-number_keys = [
-    pyxel.KEY_1,
-    pyxel.KEY_2,
-    pyxel.KEY_3,
-    pyxel.KEY_4,
-    pyxel.KEY_5,
-    pyxel.KEY_6,
-    pyxel.KEY_7,
-    pyxel.KEY_8,
-]
+    # 左右の壁との当たり判定
+    if obj["x"] < 0 or obj["x"] > 160:
+        obj["velocity_x"] = -obj["velocity_x"] * obj["bounce"]
+        obj["x"] = max(0, min(obj["x"], 160))
 
 
-# =========================
-# 更新処理
-# =========================
+def create_projectile(start_x, start_y, target_x, target_y, flight_time=60):
+    """指定された時間で目標地点に到達する放物線軌道"""
+    dx = target_x - start_x
+    dy = target_y - start_y
 
+    # 初期速度を計算
+    velocity_x = dx / flight_time
+    velocity_y = dy / flight_time - 0.5 * 0.2 * flight_time  # 重力を考慮
+
+    return {
+        "x": start_x, "y": start_y,
+        "velocity_x": velocity_x,
+        "velocity_y": velocity_y,
+        "gravity": 0.2,
+        "time": 0
+    }
+
+def update_projectile(proj):
+    proj["time"] += 1
+
+    proj["x"] += proj["velocity_x"]
+    proj["y"] += proj["velocity_y"]
+    proj["velocity_y"] += proj["gravity"]
+
+    # スペースキーで発射
+    if pyxel.btnp(pyxel.KEY_SPACE):
+        return create_projectile(
+            obj["x"],
+            obj["y"],
+            pyxel.mouse_x,
+            pyxel.mouse_y
+        )
+
+    # 画面の下に行ったらランダム発射
+    if proj["y"] > 120:
+        return create_projectile(
+            20,
+            100,
+            pyxel.rndi(20, 140),
+            pyxel.rndi(20, 100)
+        )
+
+    return proj
 def update():
-    global current_character, detail_mode
+    global projectile
 
-    # 詳細画面切り替え
-    if pyxel.btnp(pyxel.KEY_RETURN):
-        detail_mode = not detail_mode
-
-    # 左右移動
-    if pyxel.btnp(pyxel.KEY_LEFT):
-        current_character = (current_character - 1) % len(characters)
-
-    if pyxel.btnp(pyxel.KEY_RIGHT):
-        current_character = (current_character + 1) % len(characters)
-
-    # 数字キー選択
-    for i in range(min(8, len(characters))):
-        if pyxel.btnp(number_keys[i]):
-            current_character = i
-
-
-# =========================
-# HPバー
-# =========================
-
-def draw_hp_bar(x, y, hp):
-    max_width = 50
-
-    # 最大HP200基準
-    width = int((hp / 200) * max_width)
-
-    pyxel.rect(x, y, max_width, 5, 5)
-    pyxel.rect(x, y, width, 5, 8)
-    pyxel.rectb(x, y, max_width, 5, 7)
-
-
-# =========================
-# 描画処理
-# =========================
+    update_physics_object(obj)
+    projectile = update_projectile(projectile)
 
 def draw():
-    pyxel.cls(1)
+    pyxel.cls(0)
+    pyxel.circ(int(obj["x"]), int(obj["y"]), 5, 8)
+    pyxel.circ(int(projectile["x"]), int(projectile["y"]), 3, 10)
+    pyxel.circ(pyxel.mouse_x, pyxel.mouse_y, 1, 7)
 
-    char = characters[current_character]
+pyxel.init(160, 120, title="Physics Demo")
 
-    # =====================
-    # 詳細画面
-    # =====================
-
-    if detail_mode:
-
-        pyxel.cls(0)
-
-        pyxel.text(10, 10, f"=== {char['name']} ===", 14)
-
-        # 大きなスプライト
-        pyxel.blt(
-            100,
-            25,
-            0,
-            char["sprite_x"],
-            char["sprite_y"],
-            16,
-            16,
-            0
-        )
-
-        # ステータス
-        pyxel.text(10, 35, f"HP : {char['hp']}", 8)
-        pyxel.text(10, 45, f"MP : {char['mp']}", 12)
-        pyxel.text(10, 55, f"Skill : {char['skill']}", 10)
-
-        # HPバー
-        draw_hp_bar(10, 70, char["hp"])
-
-        # 説明文
-        pyxel.text(10, 85, char["description"], 6)
-
-        pyxel.text(10, 110, "RETURN : Back", 7)
-
-    # =====================
-    # 一覧画面
-    # =====================
-
-    else:
-
-        # アニメーション
-        animation_frame = (pyxel.frame_count // 20) % 2
-        sprite_x = char["sprite_x"] + animation_frame * 16
-
-        # メインスプライト
-        pyxel.blt(
-            68,
-            35,
-            0,
-            sprite_x,
-            char["sprite_y"],
-            16,
-            16,
-            0
-        )
-
-        # 情報
-        pyxel.text(
-            10,
-            10,
-            f"Monster {current_character + 1}/{len(characters)}",
-            7
-        )
-
-        pyxel.text(10, 25, char["name"], char["color"])
-
-        pyxel.text(10, 40, f"HP : {char['hp']}", 8)
-        pyxel.text(10, 50, f"MP : {char['mp']}", 12)
-        pyxel.text(10, 60, f"Skill : {char['skill']}", 10)
-
-        # HPバー
-        draw_hp_bar(10, 72, char["hp"])
-
-        # 説明文
-        pyxel.text(10, 82, char["description"], 6)
-
-        # 操作説明
-        pyxel.text(10, 95, "LEFT/RIGHT : Select", 7)
-        pyxel.text(10, 103, "1-8 : Direct Select", 7)
-        pyxel.text(10, 111, "RETURN : Detail", 7)
-
-        # 小キャラ一覧
-        for i, c in enumerate(characters):
-
-            x = 115 + (i % 4) * 10
-            y = 70 + (i // 4) * 12
-
-            # 選択枠
-            if i == current_character:
-                pyxel.rectb(x - 1, y - 1, 10, 10, 14)
-
-            # 小スプライト
-            pyxel.blt(
-                x,
-                y,
-                0,
-                c["sprite_x"],
-                c["sprite_y"],
-                8,
-                8,
-                0
-            )
-
-
-# =========================
-# 実行
-# =========================
-
+obj = create_physics_object(80, 60)
+projectile = create_projectile(20, 100, 140, 40)
 pyxel.run(update, draw)
