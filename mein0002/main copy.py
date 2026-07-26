@@ -1,84 +1,94 @@
 import pyxel
 
-pyxel.init(160, 120, fps=3)
-
-falling_objects = []
-
-
-def weighted_choice(weights):
-    total = sum(weights.values())
-    r = pyxel.rndi(1, total)
-
-    current = 0
-    for key, weight in weights.items():
-        current += weight
-        if r <= current:
-            return key
-
-
-def spawn_object():
-    new_object = {
-        "x": pyxel.rndi(0, 159),
-        "y": -10,
-        "speed": pyxel.rndf(1.0, 4.0),
-        "color": pyxel.rndi(8, 15),
-        "size": pyxel.rndi(3, 8),
-        "type": weighted_choice({
-            "star": 60,
-            "heart": 30,
-            "diamond": 10
-        })
+def create_physics_object(x, y):
+    return {
+        "x": x, "y": y,
+        "velocity_x": pyxel.rndf(-3.0, 3.0),  # 横方向の初期速度
+        "velocity_y": 0,                       # 縦方向の初期速度
+        "gravity": 0.2,                       # 重力加速度
+        "bounce": 0.7,                        # 跳ね返り係数
+        "friction": 0.98                      # 空気抵抗
     }
-    falling_objects.append(new_object)
+
+def update_physics_object(obj):
+    # 重力を適用
+    obj["velocity_y"] += obj["gravity"]
+
+    # 空気抵抗を適用
+    obj["velocity_x"] *= obj["friction"]
+
+    # 位置を更新
+    obj["x"] += obj["velocity_x"]
+    obj["y"] += obj["velocity_y"]
+
+    # 地面との当たり判定
+    if obj["y"] > 110:  # 地面の高さ
+        obj["y"] = 110
+        obj["velocity_y"] = -obj["velocity_y"] * obj["bounce"]  # 跳ね返り
+
+    # 左右の壁との当たり判定
+    if obj["x"] < 0 or obj["x"] > 160:
+        obj["velocity_x"] = -obj["velocity_x"] * obj["bounce"]
+        obj["x"] = max(0, min(obj["x"], 160))
 
 
-def update_objects():
-    for obj in falling_objects:
-        obj["y"] += obj["speed"]
+def create_projectile(start_x, start_y, target_x, target_y, flight_time=60):
+    """指定された時間で目標地点に到達する放物線軌道"""
+    dx = target_x - start_x
+    dy = target_y - start_y
 
-    falling_objects[:] = [
-        obj for obj in falling_objects
-        if obj["y"] < 130
-    ]
+    # 初期速度を計算
+    velocity_x = dx / flight_time
+    velocity_y = dy / flight_time - 0.5 * 0.2 * flight_time  # 重力を考慮
 
+    return {
+        "x": start_x, "y": start_y,
+        "velocity_x": velocity_x,
+        "velocity_y": velocity_y,
+        "gravity": 0.2,
+        "time": 0
+    }
 
-def draw_star(x, y, size, color):
-    pyxel.circ(x, y, size, color)
-    pyxel.line(x - size, y, x + size, y, 7)
-    pyxel.line(x, y - size, x, y + size, 7)
+def update_projectile(proj):
+    proj["time"] += 1
 
+    proj["x"] += proj["velocity_x"]
+    proj["y"] += proj["velocity_y"]
+    proj["velocity_y"] += proj["gravity"]
 
-def draw_heart(x, y, size, color):
-    pyxel.circ(x - size // 2, y - size // 2, size // 2, color)
-    pyxel.circ(x + size // 2, y - size // 2, size // 2, color)
-    pyxel.tri(x - size, y, x, y + size, x + size, y, color)
+    # スペースキーで発射
+    if pyxel.btnp(pyxel.KEY_SPACE):
+        return create_projectile(
+            obj["x"],
+            obj["y"],
+            pyxel.mouse_x,
+            pyxel.mouse_y
+        )
 
+    # 画面の下に行ったらランダム発射
+    if proj["y"] > 120:
+        return create_projectile(
+            20,
+            100,
+            pyxel.rndi(20, 140),
+            pyxel.rndi(20, 100)
+        )
 
-def draw_diamond(x, y, size, color):
-    pyxel.tri(x, y - size, x - size, y, x + size, y, color)
-    pyxel.tri(x - size, y, x, y + size, x + size, y, color)
-
-
-def draw_objects():
-    for obj in falling_objects:
-        if obj["type"] == "star":
-            draw_star(obj["x"], obj["y"], obj["size"], obj["color"])
-        elif obj["type"] == "heart":
-            draw_heart(obj["x"], obj["y"], obj["size"], obj["color"])
-        elif obj["type"] == "diamond":
-            draw_diamond(obj["x"], obj["y"], obj["size"], obj["color"])
-
-
+    return proj
 def update():
-    if pyxel.frame_count % 5 == 0:  # 出現頻度を調整
-        spawn_object()
+    global projectile
 
-    update_objects()
-
+    update_physics_object(obj)
+    projectile = update_projectile(projectile)
 
 def draw():
     pyxel.cls(0)
-    draw_objects()
+    pyxel.circ(int(obj["x"]), int(obj["y"]), 5, 8)
+    pyxel.circ(int(projectile["x"]), int(projectile["y"]), 3, 10)
+    pyxel.circ(pyxel.mouse_x, pyxel.mouse_y, 1, 7)
 
+pyxel.init(160, 120, title="Physics Demo")
 
+obj = create_physics_object(80, 60)
+projectile = create_projectile(20, 100, 140, 40)
 pyxel.run(update, draw)
