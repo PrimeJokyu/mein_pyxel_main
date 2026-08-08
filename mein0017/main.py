@@ -1,16 +1,83 @@
 import pyxel
-#コメントができる
-pyxel.init(200,200)
 
-
+# 🔄 更新処理（ゲームのルール・動きを管理）
 def update():
-    pass
+    pass # 何もしない
 
+# 🎨 描画処理（画面に絵を描く）
 def draw():
-    pyxel.cls(0)
-    pyxel.text(24,24,"Hello! My name is kazuki",7)
-pyxel.run(update,draw)
+    # 背景を水色(12番)にする
+    pyxel.cls(12)
+
+    # 1. トランペット型の耳（緑色11番 ＋ 穴は濃い緑3番）
+    # 左耳の棒の部分
+    pyxel.line(60, 45, 45, 35, 11)
+    pyxel.line(60, 46, 45, 36, 11)      # 少し太くする
+    pyxel.line(60, 45, 45, 35, 0)       # 輪郭線
+    pyxel.line(60, 47, 45, 37, 0)
+    # 左耳の先端（ラッパの開いた部分）
+    pyxel.circ(43, 33, 4, 11)           # 緑の丸
+    pyxel.circb(43, 33, 4, 0)          # 黒いフチ
+    pyxel.circ(43, 33, 2, 3)            # 濃い緑の穴
+
+    # 右耳の棒の部分
+    pyxel.line(100, 45, 115, 35, 11)
+    pyxel.line(100, 46, 115, 36, 11)
+    pyxel.line(100, 45, 115, 35, 0)
+    pyxel.line(100, 47, 115, 37, 0)
+    # 右耳の先端
+    pyxel.circ(117, 33, 4, 11)
+    pyxel.circb(117, 33, 4, 0)
+    pyxel.circ(117, 33, 2, 3)
+
+    # 2. 顔のベース（緑色11番 ＋ 下膨れの輪郭）
+    # 黒い輪郭線（頭と、ふっくらしたアゴ）
+    pyxel.circb(80, 50, 22, 0)          # 頭の輪郭
+    pyxel.circb(80, 68, 20, 0)          # アゴの輪郭
+    
+    # 緑色(11番)で塗りつぶして、中の余計な黒線を消す
+    pyxel.circ(80, 50, 21, 11)
+    pyxel.circ(80, 68, 19, 11)
+
+    # 3. 茶色い眉毛（ハの字で情けない感じ）
+    pyxel.line(63, 41, 74, 43, 4)       # 左眉（茶色4番）
+    pyxel.line(63, 42, 74, 44, 4)
+    pyxel.line(86, 43, 97, 41, 4)       # 右眉
+    pyxel.line(86, 44, 97, 42, 4)
+
+    # 4. 目（少しトロンとした丸い目）
+    # 左目
+    pyxel.circ(70, 48, 4, 7)            # 白目
+    pyxel.circb(70, 48, 4, 0)           # 目のフチ
+    pyxel.circ(70, 48, 1.5, 4)          # 茶色い瞳
+    
+    # 右目
+    pyxel.circ(90, 48, 4, 7)            # 白目
+    pyxel.circb(90, 48, 4, 0)           # 目のフチ
+    pyxel.circ(90, 48, 1.5, 4)          # 茶色い瞳
+
+    # 5. 平べったい鼻
+    pyxel.circ(80, 61, 5, 11)           # 鼻の頭
+    pyxel.circb(80, 61, 5, 0)           # 鼻のフチ
+    pyxel.pset(78, 62, 0)               # 左の鼻の穴
+    pyxel.pset(82, 62, 0)               # 右の鼻の穴
+
+    # 6. ニヤリとした大きな口
+    # 笑った口の線
+    pyxel.line(68, 76, 92, 76, 0)
+    pyxel.line(65, 74, 68, 76, 0)       # 左の口角（口の端）を上げる
+    pyxel.line(92, 76, 95, 74, 0)       # 右の口角を上げる
+    # 下唇の影（濃い緑3番）
+    pyxel.line(74, 79, 86, 79, 3)
+
+    # 7. キャラクター名表示
+    pyxel.text(10, 10, "SHREK", 0)
 
 
 
 
+
+
+# ▶️ ゲーム開始
+pyxel.init(160, 120)
+pyxel.run(update, draw)
