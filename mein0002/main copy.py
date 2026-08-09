@@ -1,94 +1,72 @@
 import pyxel
 
-def create_physics_object(x, y):
-    return {
-        "x": x, "y": y,
-        "velocity_x": pyxel.rndf(-3.0, 3.0),  # 横方向の初期速度
-        "velocity_y": 0,                       # 縦方向の初期速度
-        "gravity": 0.2,                       # 重力加速度
-        "bounce": 0.7,                        # 跳ね返り係数
-        "friction": 0.98                      # 空気抵抗
-    }
+# ゲーム状態
+STATE_TITLE = 0
+STATE_GAME = 1
 
-def update_physics_object(obj):
-    # 重力を適用
-    obj["velocity_y"] += obj["gravity"]
+current_state = STATE_TITLE
+player_x = 80
+player_y = 60
 
-    # 空気抵抗を適用
-    obj["velocity_x"] *= obj["friction"]
+pyxel.init(160, 120)
 
-    # 位置を更新
-    obj["x"] += obj["velocity_x"]
-    obj["y"] += obj["velocity_y"]
-
-    # 地面との当たり判定
-    if obj["y"] > 110:  # 地面の高さ
-        obj["y"] = 110
-        obj["velocity_y"] = -obj["velocity_y"] * obj["bounce"]  # 跳ね返り
-
-    # 左右の壁との当たり判定
-    if obj["x"] < 0 or obj["x"] > 160:
-        obj["velocity_x"] = -obj["velocity_x"] * obj["bounce"]
-        obj["x"] = max(0, min(obj["x"], 160))
-
-
-def create_projectile(start_x, start_y, target_x, target_y, flight_time=60):
-    """指定された時間で目標地点に到達する放物線軌道"""
-    dx = target_x - start_x
-    dy = target_y - start_y
-
-    # 初期速度を計算
-    velocity_x = dx / flight_time
-    velocity_y = dy / flight_time - 0.5 * 0.2 * flight_time  # 重力を考慮
-
-    return {
-        "x": start_x, "y": start_y,
-        "velocity_x": velocity_x,
-        "velocity_y": velocity_y,
-        "gravity": 0.2,
-        "time": 0
-    }
-
-def update_projectile(proj):
-    proj["time"] += 1
-
-    proj["x"] += proj["velocity_x"]
-    proj["y"] += proj["velocity_y"]
-    proj["velocity_y"] += proj["gravity"]
-
-    # スペースキーで発射
-    if pyxel.btnp(pyxel.KEY_SPACE):
-        return create_projectile(
-            obj["x"],
-            obj["y"],
-            pyxel.mouse_x,
-            pyxel.mouse_y
-        )
-
-    # 画面の下に行ったらランダム発射
-    if proj["y"] > 120:
-        return create_projectile(
-            20,
-            100,
-            pyxel.rndi(20, 140),
-            pyxel.rndi(20, 100)
-        )
-
-    return proj
 def update():
-    global projectile
+    global current_state
 
-    update_physics_object(obj)
-    projectile = update_projectile(projectile)
+    if current_state == STATE_TITLE:
+        update_title()
+    elif current_state == STATE_GAME:
+        update_game()
 
 def draw():
+    if current_state == STATE_TITLE:
+        draw_title()
+    elif current_state == STATE_GAME:
+        draw_game()
+
+def update_title():
+    global current_state, player_x, player_y
+
+    if pyxel.btnp(pyxel.KEY_SPACE):
+        current_state = STATE_GAME
+        # ゲーム開始時にプレイヤー位置をリセット
+        player_x = 80
+        player_y = 60
+
+def update_game():
+    global current_state, player_x, player_y
+
+    # プレイヤー移動
+    if pyxel.btn(pyxel.KEY_LEFT) and player_x > 0:
+        player_x -= 2
+    if pyxel.btn(pyxel.KEY_RIGHT) and player_x < 144:
+        player_x += 2
+    if pyxel.btn(pyxel.KEY_UP) and player_y > 0:
+        player_y -= 2
+    if pyxel.btn(pyxel.KEY_DOWN) and player_y < 104:
+        player_y += 2
+
+    # タイトル画面に戻る
+    if pyxel.btnp(pyxel.KEY_R):
+        current_state = STATE_TITLE
+
+def draw_title():
+    pyxel.cls(1)
+
+    # タイトル
+    pyxel.text(60, 40, "MINI GAME", 14)
+
+    # 開始指示
+    pyxel.text(35, 80, "Press SPACE to Start", 7)
+
+def draw_game():
     pyxel.cls(0)
-    pyxel.circ(int(obj["x"]), int(obj["y"]), 5, 8)
-    pyxel.circ(int(projectile["x"]), int(projectile["y"]), 3, 10)
-    pyxel.circ(pyxel.mouse_x, pyxel.mouse_y, 1, 7)
 
-pyxel.init(160, 120, title="Physics Demo")
+    # プレイヤー
+    pyxel.rect(player_x, player_y, 16, 16, 10)
 
-obj = create_physics_object(80, 60)
-projectile = create_projectile(20, 100, 140, 40)
+    # 操作説明
+    pyxel.text(5, 5, "Arrow keys: Move", 7)
+    pyxel.text(5, 15, "R: Return to Title", 7)
+
 pyxel.run(update, draw)
