@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Battle Royale - Prototype</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Google Fonts for premium typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+    <!-- Three.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+    <!-- 3D Canvas Container -->
+    <div id="canvas-container"></div>
+
+    <!-- Crosshair (照準) -->
+    <div id="crosshair"></div>
+
+    <!-- HUD (Heads-Up Display) -->
+    <div id="hud">
+        <div class="hud-panel score-panel">
+            <span class="hud-label">ELIMS</span>
+            <span id="score-val" class="hud-value">0</span>
+        </div>
+        <div class="hud-panel ammo-panel">
+            <span class="hud-label">AMMO</span>
+            <span id="ammo-val" class="hud-value">∞</span>
+        </div>
+        
+        <!-- Building Slots -->
+        <div class="build-slots">
+            <div id="slot-weapon" class="build-slot active">
+                <span class="slot-key">Weapon</span>
+                <span class="slot-icon">🔫</span>
+            </div>
+            <div id="slot-wall" class="build-slot">
+                <span class="slot-key">Q</span>
+                <span class="slot-icon">🧱 壁</span>
+            </div>
+            <div id="slot-floor" class="build-slot">
+                <span class="slot-key">F</span>
+                <span class="slot-icon">📐 床</span>
+            </div>
+            <div id="slot-stair" class="build-slot">
+                <span class="slot-key">G</span>
+                <span class="slot-icon">📶 階段</span>
+            </div>
+        </div>
+
+        <!-- Minimap/Controls Helper -->
+        <div class="controls-guide">
+            <div><span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span> : 移動</div>
+            <div><span class="key">Space</span> : ジャンプ</div>
+            <div><span class="key">Q</span> / <span class="key">F</span> / <span class="key">G</span> : 建築切替</div>
+            <div><span class="key">Click</span> : 射撃/建築設置</div>
+        </div>
+    </div>
+
+    <!-- Blocker / Instructions for Pointer Lock -->
+    <div id="blocker">
+        <div id="instructions">
+            <h1 class="title">BATTLE ROYALE 3D</h1>
+            <p class="subtitle">最初のミッション: 敵のドロイドを撃破せよ</p>
+            <div class="start-btn">CLICK TO PLAY</div>
+            <div class="instructions-list">
+                <p><strong>[マウス移動]</strong> カメラ操作</p>
+                <p><strong>[WASD]</strong> プレイヤーの移動</p>
+                <p><strong>[スペース]</strong> ジャンプ</p>
+                <p><strong>[左クリック]</strong> 銃の発射</p>
+                <p><strong>[ESC]</strong> メニューに戻る</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game script -->
+    <script src="game.js"></script>
+</body>
+</html>
