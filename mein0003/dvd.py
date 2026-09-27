@@ -1,29 +1,29 @@
 import pyxel
 
-# 初期位置
-ball_x = 80
-ball_y = 60
-
-# 移動量
-dx = 2
-dy = 1
-
-pyxel.init(160, 120)
+# ボールの情報と状態管理 (global不使用)
+state = {
+    "x": 80,
+    "y": 60,
+    "dx": 2,
+    "dy": 1,
+    "radius": 8
+}
 
 def update():
-    global ball_x, ball_y, dx, dy
+    state["x"] += state["dx"]
+    state["y"] += state["dy"]
 
-    ball_x += dx
-    ball_y += dy
-
-    # 画面の端で跳ね返る処理
-    if ball_x < 0 or ball_x > 160:
-        dx = -dx
-    if ball_y < 0 or ball_y > 120:
-        dy = -dy
+    r = state["radius"]
+    # 画面の端で跳ね返る処理（ボールの半径を考慮）
+    if state["x"] - r < 0 or state["x"] + r > 160:
+        state["dx"] = -state["dx"]
+    if state["y"] - r < 0 or state["y"] + r > 120:
+        state["dy"] = -state["dy"]
 
 def draw():
     pyxel.cls(1)
-    pyxel.circ(ball_x, ball_y, 8, 10)
+    pyxel.circ(state["x"], state["y"], state["radius"], 10)
 
-pyxel.run(update, draw)
+if __name__ == "__main__":
+    pyxel.init(160, 120, title="DVD Bounce")
+    pyxel.run(update, draw)

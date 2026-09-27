@@ -3,14 +3,13 @@
 import pyxel
 import math
 
-# 初期設定
-pyxel.init(160, 120, fps=30)
-pyxel.load("my_game.pyxres")
-pyxel.playm(0, loop=True)
+# ゲーム全体の状態管理用辞書 (global不使用)
+state = {
+    "result_msg": "a",
+    "random_int": 0
+}
 
 # プレイヤーの情報
-a = "a"
-random_int = 0
 character = {
     "x": 80,
     "y": 60,
@@ -28,7 +27,6 @@ character = {
         "attackDOWN": [(0, 80), (16, 80), (32, 80)]
     }
 }
-
 
 # 敵の情報生成
 def make_enemy(x, y, hp, enemy_type, sprite_index):
@@ -49,7 +47,6 @@ def make_enemy(x, y, hp, enemy_type, sprite_index):
 
     return enemy
 
-
 # enemies作成
 enemies = [
     make_enemy(30, 80, 30, "slime", 0),
@@ -59,8 +56,6 @@ enemies = [
 
 # プレイヤーの動き
 def update_character():
-    global a
-
     c = character
 
     c["animation_frame"] += 1
@@ -129,11 +124,11 @@ def update_character():
                     hit = 0 < dy < 16 and abs(dx) < 12
 
                 if hit:
-                    enemy["hp"] -= 10000000000000000000000000000
+                    enemy["hp"] -= 30  # 適正ダメージ値に修正
 
             c["hit_done"] = True
 
-        # アニメーション終了判定（ここに入れるのが正解）
+        # アニメーション終了判定
         if frame_index >= len(frames):
             c["is_attacking"] = False
             c["animation_frame"] = 0
@@ -148,16 +143,13 @@ def update_character():
 # プレイヤーの描画
 def draw_character():
     c = character
-    # 現在のアニメーションフレームを取得
     frames = c["animations"][c["current_animation"]]
     frame_index = (c["animation_frame"] // c["animation_speed"]) % len(frames)
     sprite_x, sprite_y = frames[frame_index]
     pyxel.blt(c["x"], c["y"], 0, sprite_x, sprite_y, c["direction"], 16, 1)
 
-
 # 敵の動き
 def update_enemy_ai(enemy):
-
     c = character
 
     if enemy["type"] == "slime":
@@ -187,17 +179,14 @@ def update_enemy_ai(enemy):
 
 # 敵の状態
 def update_enemy_state(enemy):
-    global random_int, a
     if enemy["state"] == "alive" and enemy["hp"] <= 0:
         enemy["state"] = "dying"
         enemy["timer"] = 30
-        random_int = pyxel.rndi(0, 100)
-        if random_int >= 50:
-            a = "atari"
+        state["random_int"] = pyxel.rndi(0, 100)
+        if state["random_int"] >= 50:
+            state["result_msg"] = "atari"
         else:
-            a = "hazure"
-
-        print(random_int)
+            state["result_msg"] = "hazure"
 
     if enemy["state"] == "dying":
         enemy["timer"] -= 1
@@ -222,7 +211,7 @@ def draw_enemy():
 
         # HPバー
         if enemy["state"] == "alive":
-            w = int(16 * enemy["hp"] / enemy["max_hp"])
+            w = max(0, int(16 * enemy["hp"] / enemy["max_hp"]))
             y = max(enemy["y"] - 4, 0)
             pyxel.rect(enemy["x"], y, w, 2, 8)
 
@@ -236,8 +225,13 @@ def draw():
     pyxel.cls(12)
     draw_character()
     draw_enemy()
-    pyxel.text(5, 5, str(a), 15)
+    pyxel.text(5, 5, str(state["result_msg"]), 15)
 
-
-# 実行
-pyxel.run(update, draw)
+if __name__ == "__main__":
+    pyxel.init(160, 120, fps=30)
+    try:
+        pyxel.load("my_game.pyxres")
+        pyxel.playm(0, loop=True)
+    except Exception:
+        pass
+    pyxel.run(update, draw)
