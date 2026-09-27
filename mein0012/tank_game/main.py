@@ -99,6 +99,16 @@ def create_enemy(ex, ey, etype):
         "sight_range": sight_range
     }
 
+def create_item(x, y, item_type):
+    """回復アイテムのデータを生成する"""
+    return {
+        "x": x,
+        "y": y,
+        "type": item_type,  # "hp" または "ammo"
+        "radius": 4,
+        "life": 600,       # 約20秒間設置（初期配置は減らないようにできる）
+    }
+
 def load_stage(state, stage_num):
     """指定したステージ番号のマップと敵データをロードする"""
     state["stage"] = stage_num
@@ -107,7 +117,12 @@ def load_stage(state, stage_num):
     state["speed"] = 1.5
     state["hull_angle"] = 0.0     # 車体の向き（ラジアン）
     state["turret_angle"] = 0.0   # 砲塔の向き（ラジアン）
+    state["max_hp"] = 5
     state["hp"] = 5
+    
+    # 弾数（弾薬制限）と回復要素
+    state["max_ammo"] = 25
+    state["ammo"] = 15            # 初期所持弾数
     
     state["is_gameover"] = False
     state["is_cleared"] = False
@@ -117,6 +132,12 @@ def load_stage(state, stage_num):
 
     state["bullets"] = []
     state["particles"] = []
+    
+    # マップ上に初期配置する回復アイテム
+    state["items"] = [
+        create_item(W // 2 - 40, H // 2, "ammo"),
+        create_item(W // 2 + 40, H // 2, "hp"),
+    ]
 
     # ステージごとのマップ（壁）と敵の配置設定
     if stage_num % 3 == 1:
@@ -281,8 +302,9 @@ def update_game(state):
         if state["reload_timer"] > 0:
             state["reload_timer"] -= 1
 
-        # 4. 主砲発射
-        if pyxel.btn(pyxel.MOUSE_BUTTON_LEFT) and state["reload_timer"] == 0:
+        # 4. 主砲発射 (残弾あり & リロード完了時)
+        if pyxel.btn(pyxel.MOUSE_BUTTON_LEFT) and state["reload_timer"] == 0 and state["ammo"] > 0:
+            state["ammo"] -= 1
             state["reload_timer"] = state["max_reload_time"]
 
             barrel_len = 10
@@ -461,6 +483,11 @@ def update_game(state):
                                 "vx": random.uniform(-3.0, 3.0), "vy": random.uniform(-3.0, 3.0),
                                 "color": random.choice([7, 8, 9, 10, 14]), "life": 15
                             })
+
+                        # 60%の確率で回復アイテムをドロップ
+                        if random.random() < 0.6:
+                            drop_type = "hp" if random.random() < 0.4 else "ammo"
+                            state["items"].append(create_item(e["x"], e["y"], drop_type))
                     break
             if hit_enemy:
                 if b in state["bullets"]:
@@ -507,6 +534,36 @@ def update_game(state):
         if p["life"] <= 0:
             state["particles"].remove(p)
 
+    # 8. 回復アイテムの更新 & 取得判定
+    for item in state["items"][:]:
+        if item["life"] > 0:
+            item["life"] -= 1
+            if item["life"] <= 0:
+                state["items"].remove(item)
+                continue
+
+        if state["hp"] > 0:
+            idx = state["x"] - item["x"]
+            idy = state["y"] - item["y"]
+            idist = math.sqrt(idx * idx + idy * idy)
+            if idist < (6 + item["radius"]):
+                if item["type"] == "hp":
+                    if state["hp"] < state.get("max_hp", 5):
+                        state["hp"] += 1
+                elif item["type"] == "ammo":
+                    state["ammo"] = min(state.get("max_ammo", 25), state["ammo"] + 7)
+
+                for _ in range(8):
+                    state["particles"].append({
+                        "x": item["x"], "y": item["y"],
+                        "vx": random.uniform(-1.5, 1.5), "vy": random.uniform(-1.5, 1.5),
+                        "color": 11 if item["type"] == "hp" else 10,
+                        "life": 10
+                    })
+
+                if item in state["items"]:
+                    state["items"].remove(item)
+
 def draw_game(state):
     """ゲーム描画処理"""
     pyxel.cls(1)
@@ -521,6 +578,24 @@ def draw_game(state):
     for w in state["walls"]:
         pyxel.rect(w["x"], w["y"], w["w"], w["h"], 5)
         pyxel.rectb(w["x"], w["y"], w["w"], w["h"], 13)
+
+    # 回復アイテム
+    for item in state.get("items", []):
+        # 残りライフが少ない場合は点滅表示
+        if item["life"] > 0 and item["life"] < 90 and item["life"] % 6 < 3:
+            continue
+
+        if item["type"] == "hp":
+            pyxel.circ(item["x"], item["y"], item["radius"], 11)
+            pyxel.circb(item["x"], item["y"], item["radius"], 3)
+            # HPマーク (+)
+            pyxel.line(item["x"] - 2, item["y"], item["x"] + 2, item["y"], 7)
+            pyxel.line(item["x"], item["y"] - 2, item["x"], item["y"] + 2, 7)
+        elif item["type"] == "ammo":
+            pyxel.rect(item["x"] - 3, item["y"] - 3, 6, 6, 10)
+            pyxel.rectb(item["x"] - 3, item["y"] - 3, 6, 6, 9)
+            # AMMOマーク (A)
+            pyxel.text(int(item["x"]) - 1, int(item["y"]) - 2, "A", 0)
 
     # パーティクル
     for p in state["particles"]:
@@ -601,12 +676,16 @@ def draw_game(state):
     pyxel.rect(0, 0, W, 12, 0)
     
     stage_str = f"ST:{state.get('stage', 1)}"
-    hp_str = "HP:" + "♥" * state["hp"] + "♡" * (5 - state["hp"])
+    hp_str = "HP:" + "♥" * state["hp"] + "♡" * (state.get("max_hp", 5) - state["hp"])
+    ammo_str = f"AM:{state.get('ammo', 0)}/{state.get('max_ammo', 25)}"
     score_str = f"SC:{state['score']}"
-    pyxel.text(5, 3, f"{stage_str} {hp_str} {score_str}", 7)
+    pyxel.text(4, 3, f"{stage_str} {hp_str} {ammo_str} {score_str}", 7)
 
     if state["hp"] > 0:
-        if state["reload_timer"] > 0:
+        if state.get("ammo", 0) == 0:
+            pyxel.text(175, 3, "NO AMMO!", 8)
+            pyxel.rect(212, 4, 33, 4, 8)
+        elif state["reload_timer"] > 0:
             progress = (state["max_reload_time"] - state["reload_timer"]) / state["max_reload_time"]
             pyxel.text(175, 3, "RELOAD", 9)
             pyxel.rect(205, 4, 40, 4, 8)
