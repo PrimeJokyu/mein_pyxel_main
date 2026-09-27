@@ -99,15 +99,15 @@ def create_enemy(ex, ey, etype):
         "sight_range": sight_range
     }
 
-def reset_game_state(state):
-    """ゲーム状態をリセットする"""
+def load_stage(state, stage_num):
+    """指定したステージ番号のマップと敵データをロードする"""
+    state["stage"] = stage_num
     state["x"] = W // 2
     state["y"] = H // 2
     state["speed"] = 1.5
     state["hull_angle"] = 0.0     # 車体の向き（ラジアン）
     state["turret_angle"] = 0.0   # 砲塔の向き（ラジアン）
     state["hp"] = 5
-    state["score"] = 0
     
     state["is_gameover"] = False
     state["is_cleared"] = False
@@ -118,24 +118,63 @@ def reset_game_state(state):
     state["bullets"] = []
     state["particles"] = []
 
-    # 壁データ
-    state["walls"] = [
-        {"x": 70, "y": 30, "w": 16, "h": 50},   # 左上縦壁
-        {"x": 170, "y": 30, "w": 16, "h": 50},  # 右上縦壁
-        {"x": 70, "y": 112, "w": 16, "h": 50},  # 左下縦壁
-        {"x": 170, "y": 112, "w": 16, "h": 50}, # 右下縦壁
-        {"x": 118, "y": 45, "w": 20, "h": 16},  # 中央上横壁
-        {"x": 118, "y": 130, "w": 20, "h": 16}, # 中央下横壁
-    ]
+    # ステージごとのマップ（壁）と敵の配置設定
+    if stage_num % 3 == 1:
+        # ステージ1（基本パターン）
+        state["walls"] = [
+            {"x": 70, "y": 30, "w": 16, "h": 50},   # 左上縦壁
+            {"x": 170, "y": 30, "w": 16, "h": 50},  # 右上縦壁
+            {"x": 70, "y": 112, "w": 16, "h": 50},  # 左下縦壁
+            {"x": 170, "y": 112, "w": 16, "h": 50}, # 右下縦壁
+            {"x": 118, "y": 45, "w": 20, "h": 16},  # 中央上横壁
+            {"x": 118, "y": 130, "w": 20, "h": 16}, # 中央下横壁
+        ]
+        enemy_configs = [
+            (30, 30, "light"),
+            (W - 30, 30, "light"),
+            (30, H - 30, "normal"),
+            (W - 30, H - 30, "normal"),
+        ]
+    elif stage_num % 3 == 2:
+        # ステージ2（十字型エリアと広めの中央）
+        state["walls"] = [
+            {"x": 118, "y": 30, "w": 20, "h": 50},  # 中央上
+            {"x": 118, "y": 112, "w": 20, "h": 50}, # 中央下
+            {"x": 30, "y": 88, "w": 50, "h": 16},   # 左中央
+            {"x": 176, "y": 88, "w": 50, "h": 16},  # 右中央
+        ]
+        enemy_configs = [
+            (30, 30, "light"),
+            (W - 30, 30, "normal"),
+            (30, H - 30, "heavy"),
+            (W - 30, H - 30, "heavy"),
+        ]
+    else:
+        # ステージ3（四隅の壁と複数敵）
+        state["walls"] = [
+            {"x": 50, "y": 40, "w": 156, "h": 14},  # 上横壁
+            {"x": 50, "y": 138, "w": 156, "h": 14}, # 下横壁
+            {"x": 50, "y": 70, "w": 14, "h": 52},   # 左縦壁
+            {"x": 192, "y": 70, "w": 14, "h": 52},  # 右縦壁
+        ]
+        enemy_configs = [
+            (30, 25, "light"),
+            (W - 30, 25, "light"),
+            (W // 2, 25, "heavy"),
+            (30, H - 25, "normal"),
+            (W - 30, H - 25, "normal"),
+        ]
 
-    # 敵戦車データ
-    enemy_configs = [
-        (30, 30, "light"),
-        (W - 30, 30, "light"),
-        (30, H - 30, "heavy"),
-        (W - 30, H - 30, "normal"),
-    ]
     state["enemies"] = [create_enemy(ex, ey, etype) for ex, ey, etype in enemy_configs]
+
+def reset_game_state(state):
+    """ゲーム全体の初期化（ゲームオーバー時の再スタート）"""
+    state["score"] = 0
+    load_stage(state, 1)
+
+def next_stage(state):
+    """次のステージへ進む（スコアは引き継ぐ）"""
+    load_stage(state, state.get("stage", 1) + 1)
 
 def create_game_state():
     """初期ゲーム状態の辞書を生成する"""
@@ -183,10 +222,15 @@ def move_enemy_smoothly(state, e, target_angle, move_speed):
 
 def update_game(state):
     """ゲーム状態の更新処理"""
-    # ゲームオーバーまたはクリア時のリスタート処理
-    if state["is_gameover"] or state["is_cleared"]:
+    # ゲームオーバーまたはクリア時のキー入力処理
+    if state["is_gameover"]:
         if pyxel.btnp(pyxel.KEY_RETURN) or pyxel.btnp(pyxel.KEY_SPACE):
             reset_game_state(state)
+        return
+
+    if state["is_cleared"]:
+        if pyxel.btnp(pyxel.KEY_RETURN) or pyxel.btnp(pyxel.KEY_SPACE):
+            next_stage(state)
         return
 
     # 1. 戦車の操縦 (生存時のみ)
@@ -556,9 +600,10 @@ def draw_game(state):
     # 上部 UI バー
     pyxel.rect(0, 0, W, 12, 0)
     
-    hp_str = "HP: " + "♥" * state["hp"] + "♡" * (5 - state["hp"])
-    score_str = f"SCORE: {state['score']}"
-    pyxel.text(5, 3, f"{hp_str}  {score_str}", 7)
+    stage_str = f"ST:{state.get('stage', 1)}"
+    hp_str = "HP:" + "♥" * state["hp"] + "♡" * (5 - state["hp"])
+    score_str = f"SC:{state['score']}"
+    pyxel.text(5, 3, f"{stage_str} {hp_str} {score_str}", 7)
 
     if state["hp"] > 0:
         if state["reload_timer"] > 0:
@@ -572,16 +617,18 @@ def draw_game(state):
 
     # ゲームオーバー・クリア画面表示
     if state["is_gameover"]:
-        pyxel.rect(W // 2 - 60, H // 2 - 20, 120, 40, 0)
-        pyxel.rectb(W // 2 - 60, H // 2 - 20, 120, 40, 8)
-        pyxel.text(W // 2 - 27, H // 2 - 10, "GAME OVER", 8)
-        pyxel.text(W // 2 - 45, H // 2 + 5, "PRESS ENTER TO PLAY", 7)
+        pyxel.rect(W // 2 - 65, H // 2 - 22, 130, 44, 0)
+        pyxel.rectb(W // 2 - 65, H // 2 - 22, 130, 44, 8)
+        pyxel.text(W // 2 - 27, H // 2 - 12, "GAME OVER", 8)
+        pyxel.text(W // 2 - 45, H // 2 + 2, f"FINAL SCORE: {state['score']}", 10)
+        pyxel.text(W // 2 - 50, H // 2 + 12, "PRESS ENTER TO RETRY", 7)
     
     elif state["is_cleared"]:
-        pyxel.rect(W // 2 - 65, H // 2 - 20, 130, 40, 0)
-        pyxel.rectb(W // 2 - 65, H // 2 - 20, 130, 40, 11)
-        pyxel.text(W // 2 - 32, H // 2 - 10, "STAGE CLEAR!", 11)
-        pyxel.text(W // 2 - 45, H // 2 + 5, "PRESS ENTER TO PLAY", 7)
+        pyxel.rect(W // 2 - 70, H // 2 - 22, 140, 44, 0)
+        pyxel.rectb(W // 2 - 70, H // 2 - 22, 140, 44, 11)
+        pyxel.text(W // 2 - 32, H // 2 - 12, "STAGE CLEAR!", 11)
+        pyxel.text(W // 2 - 45, H // 2 + 2, f"STAGE {state.get('stage', 1)} COMPLETED", 10)
+        pyxel.text(W // 2 - 55, H // 2 + 12, "PRESS ENTER FOR NEXT", 7)
 
 def main():
     # Pyxel初期化
